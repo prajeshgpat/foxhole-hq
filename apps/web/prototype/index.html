@@ -9,13 +9,14 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400;12..96,600;12..96,800&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
 <style>
-/* Layout: app shell. Header, then the iso den stage beside a roster/detail rail, event stream full width beneath. Committed night-den look. */
+/* Layout: one HQ floor. Header, global needs-you bar, then the explorable iso floor (every repo is a department room) beside a rail of departments and the selected fox. Event stream full width beneath. Committed night look. */
 :root {
   color-scheme: dark;
   --bg: #111916;
   --surface: #19231f;
   --raise: #222f2a;
   --line: #2d3c35;
+  --line-hi: #41554b;
   --fg: #f1e9dc;
   --muted: #98aba0;
   --fox: #f08a3c;
@@ -37,95 +38,89 @@ body {
 }
 .mono { font-family: var(--mono); font-variant-numeric: tabular-nums; }
 .muted { color: var(--muted); }
-.wrap { max-width: 1280px; margin: 0 auto; display: grid; gap: 14px; }
+.wrap { max-width: 1400px; margin: 0 auto; display: grid; gap: 14px; }
+button { font: inherit; color: inherit; border: 0; cursor: pointer; background: none; }
+button:focus-visible, input:focus-visible, canvas:focus-visible { outline: 2px solid var(--fox); outline-offset: 2px; }
 
 header { display: flex; flex-wrap: wrap; gap: 12px 20px; align-items: center; justify-content: space-between; }
-.brand { display: flex; align-items: center; flex-wrap: wrap; gap: 6px 12px; }
+.brand { display: flex; align-items: center; flex-wrap: wrap; gap: 6px 14px; min-width: 0; }
 .brand h1 { font-size: 24px; font-weight: 800; letter-spacing: -0.015em; margin: 0; }
 .brand h1 span { color: var(--fox); }
-.den-path { font-family: var(--mono); font-size: 12px; color: var(--muted); }
+.hq { font-family: var(--mono); font-size: 13px; color: var(--muted); }
 .live { display: inline-flex; align-items: center; gap: 6px; font-size: 11px; font-weight: 600; letter-spacing: 0.09em; text-transform: uppercase; color: var(--ok); }
 .live i { width: 7px; height: 7px; border-radius: 50%; background: var(--ok); animation: pulse 2s infinite; }
 @keyframes pulse { 0% { box-shadow: 0 0 0 0 rgba(127, 211, 160, 0.55); } 100% { box-shadow: 0 0 0 8px rgba(127, 211, 160, 0); } }
-
 .controls { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
-button { font: inherit; color: inherit; border: 0; cursor: pointer; background: none; }
-button:focus-visible, input:focus-visible { outline: 2px solid var(--fox); outline-offset: 2px; }
 .seg { display: inline-flex; border: 1px solid var(--line); border-radius: 9px; overflow: hidden; background: var(--surface); }
 .seg button { padding: 6px 11px; font-size: 12px; font-weight: 600; color: var(--muted); }
 .seg button + button { border-left: 1px solid var(--line); }
 .seg button[aria-pressed="true"] { background: var(--raise); color: var(--fg); }
 .toggle { display: inline-flex; align-items: center; gap: 8px; font-size: 12px; color: var(--muted); cursor: pointer; padding: 6px 10px; border: 1px solid var(--line); border-radius: 9px; background: var(--surface); }
 .toggle input { accent-color: var(--fox); margin: 0; }
-
-.note { margin: 0; color: var(--muted); max-width: 75ch; }
-.note code { font-family: var(--mono); font-size: 12px; color: var(--fg); }
-
-.main { display: grid; grid-template-columns: minmax(0, 1fr) 340px; gap: 14px; align-items: start; }
-@media (max-width: 960px) { .main { grid-template-columns: minmax(0, 1fr); } }
-
-.stage {
-  position: relative;
-  height: clamp(400px, 66vh, 660px);
-  border: 1px solid var(--line);
-  border-radius: 14px;
-  overflow: hidden;
-  background: radial-gradient(120% 90% at 50% 35%, #1d2a25 0%, #0e1513 70%);
-}
-canvas { display: block; width: 100%; height: 100%; cursor: pointer; touch-action: manipulation; }
-.hud { position: absolute; top: 12px; left: 12px; right: 12px; display: flex; flex-wrap: wrap; justify-content: space-between; gap: 8px; pointer-events: none; }
-.chip { display: inline-flex; align-items: center; gap: 10px; padding: 7px 12px; border-radius: 10px; background: rgba(17, 25, 22, 0.82); border: 1px solid var(--line); font-size: 12px; backdrop-filter: blur(4px); }
-.chip strong { font-weight: 600; }
+.chip { display: inline-flex; align-items: center; gap: 10px; padding: 7px 12px; border-radius: 10px; background: rgba(17, 25, 22, 0.86); border: 1px solid var(--line); font-size: 12px; }
 .lvl-badge { font-weight: 800; color: var(--fox); }
-.bar { width: 110px; height: 6px; border-radius: 3px; background: var(--raise); overflow: hidden; }
+.bar { width: 100px; height: 6px; border-radius: 3px; background: var(--raise); overflow: hidden; }
 .bar b { display: block; height: 100%; width: 0; background: linear-gradient(90deg, var(--fox), var(--alert)); transition: width 0.6s ease; }
 
-.alert {
-  position: absolute; left: 12px; right: 12px; bottom: 12px;
-  display: flex; flex-wrap: wrap; align-items: center; gap: 10px 14px;
-  padding: 10px 12px;
-  border-radius: 12px;
-  background: rgba(40, 32, 12, 0.94);
-  border: 1px solid rgba(255, 200, 87, 0.55);
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
-}
+.alert { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 14px; padding: 10px 14px; border-radius: 12px; min-height: 60px; box-sizing: border-box; }
+.alert.on { background: rgba(40, 32, 12, 0.94); border: 1px solid rgba(255, 200, 87, 0.55); }
+.alert.off { background: var(--surface); border: 1px solid var(--line); color: var(--muted); }
 .alert-icon { width: 28px; height: 28px; border-radius: 50%; display: grid; place-items: center; background: var(--alert); color: #2a1d05; font-weight: 800; flex: none; }
-.alert-body { display: grid; gap: 1px; min-width: 0; flex: 1 1 220px; }
+.alert.off .alert-icon { background: var(--raise); color: var(--ok); }
+.alert-body { display: grid; gap: 1px; min-width: 0; flex: 1 1 260px; }
 .alert-body strong { font-weight: 600; }
-.alert-body span { font-size: 12px; color: #e8d6a8; overflow-wrap: anywhere; }
-.alert-actions { display: flex; gap: 8px; }
+.alert.off .alert-body strong { font-weight: 400; }
+.alert-body span { font-family: var(--mono); font-size: 12px; color: #e8d6a8; overflow-wrap: anywhere; }
+.alert-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.alert.off .alert-actions, .alert.off .alert-body span { display: none; }
 .btn { padding: 7px 14px; border-radius: 8px; font-weight: 600; font-size: 13px; }
 .btn.primary { background: var(--alert); color: #2a1d05; }
 .btn.ghost { border: 1px solid rgba(255, 200, 87, 0.45); color: #f3e2b5; }
 
-.toasts { position: absolute; right: 12px; top: 58px; display: grid; gap: 8px; justify-items: end; pointer-events: none; }
-.toast { padding: 8px 12px; border-radius: 10px; background: rgba(17, 25, 22, 0.92); border: 1px solid var(--line); font-size: 12px; max-width: 260px; animation: toastIn 0.35s ease; }
+.main { display: grid; grid-template-columns: minmax(0, 1fr) 330px; gap: 14px; align-items: start; }
+@media (max-width: 980px) { .main { grid-template-columns: minmax(0, 1fr); } }
+.stage { position: relative; height: clamp(440px, 74vh, 820px); border: 1px solid var(--line); border-radius: 14px; overflow: hidden; background: radial-gradient(110% 90% at 50% 40%, #1b2823 0%, #0c1210 75%); }
+.stage canvas { display: block; width: 100%; height: 100%; cursor: grab; touch-action: none; }
+.stage canvas.dragging { cursor: grabbing; }
+.cam { position: absolute; top: 12px; right: 12px; display: flex; gap: 6px; }
+.cam button { min-width: 36px; height: 36px; padding: 0 10px; border-radius: 9px; background: rgba(17, 25, 22, 0.86); border: 1px solid var(--line); font-weight: 600; font-size: 13px; }
+.cam button:hover { border-color: var(--line-hi); }
+.where { position: absolute; top: 12px; left: 12px; pointer-events: none; }
+.hint { position: absolute; left: 12px; bottom: 12px; pointer-events: none; font-size: 12px; color: var(--muted); background: rgba(17, 25, 22, 0.8); border: 1px solid var(--line); border-radius: 9px; padding: 6px 10px; max-width: calc(100% - 24px); }
+
+.toasts { position: fixed; z-index: 20; right: max(16px, env(safe-area-inset-right, 0px)); bottom: max(16px, env(safe-area-inset-bottom, 0px)); display: grid; gap: 8px; justify-items: end; pointer-events: none; max-width: calc(100% - 32px); }
+.toast { padding: 9px 13px; border-radius: 10px; background: rgba(17, 25, 22, 0.95); border: 1px solid var(--line-hi); font-size: 12px; max-width: 290px; box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35); animation: toastIn 0.35s ease; }
 .toast b { display: block; color: var(--alert); font-weight: 600; }
-@keyframes toastIn { from { transform: translateY(-6px); opacity: 0.4; } to { transform: none; opacity: 1; } }
+@keyframes toastIn { from { transform: translateY(6px); opacity: 0.4; } to { transform: none; opacity: 1; } }
 
 .rail { display: grid; gap: 14px; min-width: 0; }
 .panel { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px; min-width: 0; }
 .panel h2, .panel h3 { font-size: 11px; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted); margin: 0 0 10px; }
 .panel h3 { margin: 14px 0 8px; }
-
-.roster { display: grid; gap: 6px; }
-.fox-card {
-  display: grid; grid-template-columns: 10px minmax(0, 1fr) auto; column-gap: 10px; row-gap: 2px;
-  align-items: center; text-align: left;
-  padding: 8px 10px; border-radius: 9px; border: 1px solid transparent;
-}
-.fox-card:hover { background: var(--raise); }
-.fox-card[aria-pressed="true"] { background: var(--raise); border-color: var(--line); }
-.dot { width: 10px; height: 10px; border-radius: 50%; }
-.fc-name { font-weight: 600; display: flex; gap: 8px; align-items: baseline; min-width: 0; }
-.src { font-family: var(--mono); font-size: 10px; color: var(--muted); font-weight: 400; }
-.fc-line { grid-column: 2 / 4; font-family: var(--mono); font-size: 11px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.pill { font-size: 10px; font-weight: 600; letter-spacing: 0.05em; text-transform: uppercase; padding: 2px 7px; border-radius: 99px; border: 1px solid currentColor; white-space: nowrap; }
-.s-busy { color: var(--ok); } .s-wait { color: var(--alert); } .s-done { color: var(--fox); } .s-err { color: var(--err); } .s-idle, .s-sleep { color: var(--muted); }
-
-.d-head { display: flex; align-items: center; gap: 8px; }
+.depts { display: grid; gap: 8px; }
+.dept { display: grid; gap: 4px; padding: 6px; border-radius: 10px; border: 1px solid var(--line); }
+.dept-top { width: 100%; padding: 4px 6px; border-radius: 7px; text-align: left; }
+.dept-top:hover, .branch:hover { background: var(--raise); }
+.branches { display: grid; gap: 2px; }
+.branch { display: grid; gap: 3px; padding: 4px 6px 4px 22px; border-radius: 7px; text-align: left; }
+.bname { display: flex; align-items: center; gap: 7px; font-family: var(--mono); font-size: 11.5px; color: var(--muted); overflow-wrap: anywhere; }
+.bname i { width: 8px; height: 8px; border-radius: 2px; flex: none; }
+.branch.need .bname { color: var(--alert); }
+.dept[aria-current="true"] { background: var(--raise); border-color: var(--line-hi); }
+.dept.need { border-color: var(--alert); }
+.dept-top { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-width: 0; }
+.dept-name { display: flex; align-items: center; gap: 8px; font-family: var(--mono); font-size: 12.5px; font-weight: 600; min-width: 0; overflow-wrap: anywhere; }
+.swatch { width: 10px; height: 10px; border-radius: 3px; flex: none; }
+.dept-state { font-size: 11px; font-weight: 600; white-space: nowrap; color: var(--muted); }
+.dept.need .dept-state { color: var(--alert); }
+.foxchips { display: flex; flex-wrap: wrap; gap: 4px 10px; font-size: 12px; color: var(--muted); }
+.foxchips span { display: inline-flex; align-items: center; gap: 5px; }
+.foxchips i { width: 7px; height: 7px; border-radius: 50%; }
+.d-head { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .d-head strong { font-size: 17px; font-weight: 800; }
-.d-quest { margin-top: 4px; color: var(--fg); }
+.dot { width: 10px; height: 10px; border-radius: 50%; }
+.src { font-family: var(--mono); font-size: 10px; color: var(--muted); }
+.d-quest { margin-top: 4px; }
 .d-quest small { display: block; color: var(--muted); font-family: var(--mono); font-size: 11px; }
 .stats { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin: 12px 0 0; }
 .stats div { background: var(--raise); border-radius: 8px; padding: 7px 9px; }
@@ -134,23 +129,23 @@ canvas { display: block; width: 100%; height: 100%; cursor: pointer; touch-actio
 .timeline { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; font-family: var(--mono); font-size: 11px; }
 .timeline li { display: grid; grid-template-columns: 58px minmax(0, 1fr); gap: 8px; color: var(--muted); }
 .timeline li span:last-child { color: var(--fg); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-pre { margin: 0; padding: 10px; border-radius: 8px; background: #0d1412; border: 1px solid var(--line); font-family: var(--mono); font-size: 11px; line-height: 1.5; color: #cfe3d6; overflow-x: auto; max-height: 260px; }
+pre { margin: 0; padding: 10px; border-radius: 8px; background: #0d1412; border: 1px solid var(--line); font-family: var(--mono); font-size: 11px; line-height: 1.5; color: #cfe3d6; overflow-x: auto; max-height: 220px; }
 
 .log-head { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: baseline; gap: 6px 12px; }
 .log-head h2 { margin: 0; }
 .log-head span { font-size: 11px; }
-.log { list-style: none; margin: 10px 0 0; padding: 0; height: 230px; overflow: auto; font-family: var(--mono); font-size: 12px; font-variant-numeric: tabular-nums; }
-.log li { display: grid; grid-template-columns: 70px 120px 150px minmax(0, 1fr); gap: 10px; padding: 3px 6px; border-radius: 6px; cursor: pointer; white-space: nowrap; }
+.log { list-style: none; margin: 10px 0 0; padding: 0; height: 220px; overflow: auto; font-family: var(--mono); font-size: 12px; font-variant-numeric: tabular-nums; }
+.log li { display: grid; grid-template-columns: 66px 160px 110px 150px minmax(0, 1fr); gap: 10px; padding: 3px 6px; border-radius: 6px; cursor: pointer; white-space: nowrap; }
 .log li:hover { background: var(--raise); }
 .log li > span { overflow: hidden; text-overflow: ellipsis; }
-.log .t { color: var(--muted); }
+.log .t, .log .repo { color: var(--muted); }
 .log .who { display: flex; align-items: center; gap: 6px; }
 .log .who i { width: 7px; height: 7px; border-radius: 50%; flex: none; }
 .log .ty-perm { color: var(--alert); } .log .ty-stop { color: var(--fox); } .log .ty-err { color: var(--err); } .log .ty-sess { color: var(--ok); }
-.log .ui-note { color: var(--muted); font-style: italic; }
-@media (max-width: 640px) {
-  .log li { grid-template-columns: 62px 90px minmax(0, 1fr); }
-  .log li > span:nth-child(3) { display: none; }
+.log .ui-note { grid-column: 2 / -1; color: var(--muted); font-style: italic; }
+@media (max-width: 720px) {
+  .log li { grid-template-columns: 58px 92px minmax(0, 1fr); }
+  .log li > span:nth-child(2), .log li > span:nth-child(4) { display: none; }
 }
 @media (prefers-reduced-motion: reduce) { .live i, .toast { animation: none; } .bar b { transition: none; } }
 </style>
@@ -161,10 +156,11 @@ pre { margin: 0; padding: 10px; border-radius: 8px; background: #0d1412; border:
   <header>
     <div class="brand">
       <h1>Foxhole <span>HQ</span></h1>
-      <span class="den-path">foxhole-hq.com/den/prajesh</span>
+      <span class="hq">prajesh's HQ · 3 departments</span>
       <span class="live"><i></i>Live</span>
     </div>
     <div class="controls">
+      <div class="chip"><span class="lvl-badge" id="lvl">Lv 7</span><div class="bar"><b id="xpbar"></b></div><span class="mono" id="xptext"></span></div>
       <div class="seg" role="group" aria-label="Simulation speed">
         <button id="sp0" type="button" aria-pressed="false">Pause</button>
         <button id="sp1" type="button" aria-pressed="true">1×</button>
@@ -175,30 +171,31 @@ pre { margin: 0; padding: 10px; border-radius: 8px; background: #0d1412; border:
     </div>
   </header>
 
-  <p class="note">An example den with four simulated agents: three Claude Code foxes and one Codex arctic fox. Each move is driven by an event in the <code>PLAN.md §5</code> schema, and the stream at the bottom shows exactly what the plugin would send. Click a fox to follow it.</p>
+  <div class="alert off" id="alert" role="status" aria-live="polite">
+    <span class="alert-icon" id="alert-icon">✓</span>
+    <div class="alert-body"><strong id="alert-title">No fox needs you right now.</strong><span id="alert-sub"></span></div>
+    <div class="alert-actions">
+      <button type="button" class="btn ghost" id="go-den">Go there</button>
+      <button type="button" class="btn ghost" id="deny">Deny</button>
+      <button type="button" class="btn primary" id="approve">Approve</button>
+    </div>
+  </div>
 
   <div class="main">
-    <section class="stage" aria-label="Den">
-      <canvas id="den" aria-label="Isometric den with animated foxes"></canvas>
-      <div class="hud">
-        <div class="chip" id="hud-den"><strong>4 foxes</strong></div>
-        <div class="chip"><span class="lvl-badge" id="lvl">Lv 7</span><div class="bar"><b id="xpbar"></b></div><span class="mono" id="xptext"></span></div>
+    <div class="stage">
+      <canvas id="floor" tabindex="0" aria-label="Foxhole HQ floor. Drag to move around, scroll or pinch to zoom, arrow keys to pan, click a department or a fox."></canvas>
+      <div class="where chip" id="where"></div>
+      <div class="cam">
+        <button type="button" id="zoom-out" aria-label="Zoom out">−</button>
+        <button type="button" id="zoom-in" aria-label="Zoom in">+</button>
+        <button type="button" id="overview">Whole floor</button>
       </div>
-      <div class="toasts" id="toasts"></div>
-      <div class="alert" id="alert" hidden>
-        <span class="alert-icon">!</span>
-        <div class="alert-body"><strong id="alert-title"></strong><span id="alert-sub" class="mono"></span></div>
-        <div class="alert-actions">
-          <button type="button" class="btn ghost" id="deny">Deny</button>
-          <button type="button" class="btn primary" id="approve">Approve</button>
-        </div>
-      </div>
-    </section>
-
+      <div class="hint" id="hint">Drag to walk around · scroll or pinch to zoom · click a department to visit it</div>
+    </div>
     <aside class="rail">
       <section class="panel">
-        <h2>Foxes</h2>
-        <div class="roster" id="roster"></div>
+        <h2>Departments</h2>
+        <div class="depts" id="depts"></div>
       </section>
       <section class="panel">
         <h2>Selected fox</h2>
@@ -219,10 +216,11 @@ pre { margin: 0; padding: 10px; border-radius: 8px; background: #0d1412; border:
   </div>
 
   <section class="panel">
-    <div class="log-head"><h2>Event stream</h2><span class="mono muted">metadata only: no code, prompts or diffs</span></div>
+    <div class="log-head"><h2>Event stream · whole HQ</h2><span class="mono muted">metadata only: no code, prompts or diffs</span></div>
     <ol class="log" id="log"></ol>
   </section>
 </div>
+<div class="toasts" id="toasts"></div>
 
 <script>
 (() => {
@@ -232,28 +230,24 @@ const css = getComputedStyle(document.documentElement);
 const V = n => css.getPropertyValue(n).trim();
 const COL = { fg: V('--fg'), muted: V('--muted'), ok: V('--ok'), alert: V('--alert'), fox: V('--fox'), err: V('--err') };
 const FONT = '"Bricolage Grotesque", system-ui, sans-serif', MONO = '"JetBrains Mono", ui-monospace, monospace';
-const TW = 64, TH = 32, COLS = 11, ROWS = 9, WH = 100;
-const P = { floorA: '#6f4d36', floorB: '#674731', wallR: '#432f24', wallL: '#382820', base: '#2b1e17', rug: '#8d3c2f', rugIn: '#b2563f',
+const TW = 64, TH = 32, COLS = 11, ROWS = 9, WH = 100, PART = 26;
+const P = { floorA: '#6f4d36', floorB: '#674731', hallA: '#4b433b', hallB: '#463e36', wallR: '#432f24', wallL: '#382820', base: '#2b1e17', part: '#5a4536',
   desk: '#a0714a', mon: '#20272b', scrOn: '#9be6ff', scrDim: '#2a4450', shelf: '#7b5337', rack: '#2c3339', cush: '#b98e66', cushIn: '#dcb991',
-  dirt: '#56392a', hole: '#140d0a', brass: '#c99a4a', cork: '#a77d52', pot: '#b0613f', leaf: '#5f9a5a', gold: '#e7b84a' };
+  dirt: '#56392a', hole: '#140d0a', brass: '#c99a4a', cork: '#a77d52', pot: '#b0613f', leaf: '#5f9a5a', gold: '#e7b84a', couch: '#3f6f78', lobby: '#7a5c42', lobbyB: '#735640' };
 
-/* ---------- geometry ---------- */
-const iso = (x, y, z = 0) => [(x - y) * TW / 2, (x + y) * TH / 2 - z];
+/* ---------- the floor plan: every repo is a department room off shared corridors ---------- */
+const BW = 24, BH = 20;
+const SLOTS = [[0, 0], [13, 0], [0, 11]];
+const LOBBY = { ox: 13, oy: 11, name: 'Commons' };
+const RUGS = [['#3d5a80', '#5b7fa8'], ['#8d3c2f', '#b2563f'], ['#3f6b4f', '#5f9270']];
+
+/* ---------- geometry; OFF shifts a room's local tiles onto the floor ---------- */
+let OFF = [0, 0];
+const isoAbs = (x, y, z = 0) => [(x - y) * TW / 2, (x + y) * TH / 2 - z];
+const iso = (x, y, z = 0) => isoAbs(x + OFF[0], y + OFF[1], z);
 function tone(h, f) { const n = parseInt(h.slice(1), 16); const c = [n >> 16, n >> 8 & 255, n & 255].map(v => Math.min(255, Math.round(v * f))); return `rgb(${c})`; }
 const B = c => ({ top: tone(c, 1.12), left: tone(c, 0.9), right: tone(c, 0.72) });
-
-const cv = document.getElementById('den'), ctx = cv.getContext('2d');
-let view = { s: 1, ox: 0, oy: 0, dpr: 1 };
-function resize() {
-  const r = cv.getBoundingClientRect(), dpr = Math.min(2, devicePixelRatio || 1);
-  cv.width = Math.round(r.width * dpr); cv.height = Math.round(r.height * dpr);
-  const minX = -ROWS * TW / 2 - 24, maxX = COLS * TW / 2 + 24, minY = -WH - 60, maxY = (COLS + ROWS) * TH / 2 + 12;
-  const top = 56, bot = 70, aw = r.width, ah = Math.max(120, r.height - top - bot);
-  const s = Math.min(aw / (maxX - minX), ah / (maxY - minY));
-  view = { s, dpr, ox: (aw - (maxX - minX) * s) / 2 - minX * s, oy: top + (ah - (maxY - minY) * s) / 2 - minY * s };
-}
-new ResizeObserver(resize).observe(cv);
-
+let ctx = null, view = null;
 function poly(pts, fill) { ctx.beginPath(); pts.forEach((p, i) => i ? ctx.lineTo(p[0], p[1]) : ctx.moveTo(p[0], p[1])); ctx.closePath(); ctx.fillStyle = fill; ctx.fill(); }
 function line(a, b, color, w = 1) { ctx.strokeStyle = color; ctx.lineWidth = w; ctx.beginPath(); ctx.moveTo(a[0], a[1]); ctx.lineTo(b[0], b[1]); ctx.stroke(); }
 function box(x, y, w, d, h, z0, c) {
@@ -261,394 +255,15 @@ function box(x, y, w, d, h, z0, c) {
   poly([iso(x + w, y, z0), iso(x + w, y + d, z0), iso(x + w, y + d, z0 + h), iso(x + w, y, z0 + h)], c.right);
   poly([iso(x, y, z0 + h), iso(x + w, y, z0 + h), iso(x + w, y + d, z0 + h), iso(x, y + d, z0 + h)], c.top);
 }
-function ell(x, y, rx, ry, fill) { ctx.fillStyle = fill; ctx.beginPath(); ctx.ellipse(x, y, rx, ry, 0, 0, TAU); ctx.fill(); }
-function tri(a, b, c, fill) { poly([a, b, c], fill); }
+function ell(x, y, rx, ry, fill) { ctx.fillStyle = fill; ctx.beginPath(); ctx.ellipse(x, y, Math.max(0, rx), Math.max(0, ry), 0, 0, TAU); ctx.fill(); }
 function rrect(x, y, w, h, r) { ctx.beginPath(); ctx.moveTo(x + r, y); ctx.arcTo(x + w, y, x + w, y + h, r); ctx.arcTo(x + w, y + h, x, y + h, r); ctx.arcTo(x, y + h, x, y, r); ctx.arcTo(x, y, x + w, y, r); ctx.closePath(); }
 
-/* seeded books for the shelf */
 let seed = 7; const srand = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
 const BOOKC = ['#c2563f', '#4f7cac', '#d9a441', '#5c8f5a', '#8b5a9e', '#e2d3b5', '#3f6f78'];
 const books = [];
 [6, 23, 40, 57].forEach(z => { let y = 3.07; while (y < 4.85) { const w = 0.09 + srand() * 0.1; books.push({ y, w, z, h: 11 + srand() * 5, c: BOOKC[Math.floor(srand() * BOOKC.length)] }); y += w + 0.015; } });
-const stars = Array.from({ length: 14 }, () => [8.5 + srand() * 1.6, 40 + srand() * 38, srand() * 6]);
+const stars = Array.from({ length: 12 }, () => [srand(), 40 + srand() * 38, srand() * 6]);
 
-/* ---------- stations & pathfinding ---------- */
-const ST = {
-  desk: k => ({ x: 1.7 + 1.8 * k, y: 1.35, face: 1 }),
-  shelf: i => [{ x: 1.05, y: 3.6, face: -1 }, { x: 1.1, y: 4.6, face: -1 }, { x: 1.6, y: 4.1, face: -1 }][i % 3],
-  rack: i => [{ x: 1.25, y: 6.45, face: -1 }, { x: 1.45, y: 5.55, face: -1 }, { x: 1.8, y: 7.1, face: -1 }][i % 3],
-  window: i => [{ x: 8.55, y: 1.75, face: 1 }, { x: 7.95, y: 2.45, face: 1 }][i % 2],
-  burrow: i => [{ x: 8.45, y: 6.4, face: 1 }, { x: 8.35, y: 5.55, face: 1 }][i % 2],
-  bed: k => ({ x: [2.4, 4.3, 6.2, 8.0][k], y: 7.75, face: 1 }),
-};
-const blocked = new Set(['0,3', '0,4', '0,5', '0,6', '9,1', '9,6', '10,6', '9,7', '10,7', '10,0']);
-for (let x = 1; x <= 7; x++) blocked.add(x + ',0');
-function findPath(ax, ay, bx, by) {
-  const k = (x, y) => x + ',' + y, s = [Math.floor(ax), Math.floor(ay)], g = [Math.floor(bx), Math.floor(by)];
-  const prev = new Map([[k(...s), null]]), q = [s];
-  while (q.length) {
-    const [x, y] = q.shift(); if (x === g[0] && y === g[1]) break;
-    for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
-      const nx = x + dx, ny = y + dy, nk = k(nx, ny);
-      if (nx < 0 || ny < 0 || nx >= COLS || ny >= ROWS || prev.has(nk)) continue;
-      if (blocked.has(nk) && !(nx === g[0] && ny === g[1])) continue;
-      prev.set(nk, [x, y]); q.push([nx, ny]);
-    }
-  }
-  if (!prev.has(k(...g))) return [[bx, by]];
-  const out = []; let c = g;
-  while (c && !(c[0] === s[0] && c[1] === s[1])) { out.unshift([c[0] + 0.5, c[1] + 0.5]); c = prev.get(k(...c)); }
-  if (out.length) out.pop();
-  out.push([bx, by]);
-  return out;
-}
-
-/* ---------- agents ---------- */
-const TOOL = {
-  Read: { st: 'shelf', act: 'read', d: [2.8, 4] }, Grep: { st: 'shelf', act: 'read', d: [2, 3] },
-  Edit: { st: 'desk', act: 'type', d: [4, 6] }, Write: { st: 'desk', act: 'type', d: [3.5, 5] },
-  Bash: { st: 'rack', act: 'bash', d: [3, 4.2] }, WebSearch: { st: 'window', act: 'gaze', d: [3, 4] },
-  Task: { st: 'burrow', act: 'task', d: [1.8, 2.4] },
-};
-const RATES = { 'claude-sonnet': [3, 15], 'claude-opus': [5, 25], 'claude-haiku': [1, 5], 'codex': [1.25, 10] };
-const AGENTS = [
-  { name: 'Ember', source: 'claude-code', model: 'claude-sonnet', fur: '#e8772e', desk: 0, bed: 0, quick: true, quests: [
-    { title: 'Fix session expiry bug', repo: 'github.com/acme/web', files: ['src/auth/session.ts', 'src/auth/session.test.ts', 'src/middleware/auth.ts'], cmds: ['pnpm test auth', 'pnpm lint'], q: 'jose jwt exp clock skew', grep: 'expiresAt' },
-    { title: 'Add remember-me toggle', repo: 'github.com/acme/web', files: ['src/auth/LoginForm.tsx', 'src/auth/session.ts', 'src/i18n/en.json'], cmds: ['pnpm test login', 'pnpm typecheck'], q: 'cookie maxAge vs expires', grep: 'rememberMe' } ] },
-  { name: 'Juniper', source: 'claude-code', model: 'claude-opus', fur: '#d9973a', desk: 1, bed: 1, quests: [
-    { title: 'Rate-limit the pairing endpoint', repo: 'github.com/foxhole-hq/foxhole-hq', files: ['apps/api/src/pair.ts', 'apps/api/src/limiter.ts', 'apps/api/wrangler.toml'], cmds: ['pnpm vitest limiter', 'wrangler deploy --dry-run'], q: 'durable objects rate limiting', grep: 'pairCode' },
-    { title: 'Expire pairing links after use', repo: 'github.com/foxhole-hq/foxhole-hq', files: ['apps/api/src/pair.ts', 'apps/api/test/pair.test.ts', 'apps/api/src/den.ts'], cmds: ['pnpm vitest pair', 'pnpm typecheck'], q: 'RFC 8628 device authorization grant', grep: 'expiresAt' } ] },
-  { name: 'Moss', source: 'codex', model: 'codex', fur: '#dfe7ec', arctic: true, desk: 2, bed: 2, quests: [
-    { title: 'Move stats page to Zustand', repo: 'github.com/foxhole-hq/foxhole-hq', files: ['apps/web/src/stats/Stats.tsx', 'apps/web/src/store/den.ts', 'apps/web/src/stats/useRecap.ts'], cmds: ['pnpm build', 'pnpm lint'], q: 'zustand subscribeWithSelector', grep: 'useState' },
-    { title: 'Add daily recap card', repo: 'github.com/foxhole-hq/foxhole-hq', files: ['apps/web/src/stats/Recap.tsx', 'apps/web/src/store/den.ts'], cmds: ['pnpm test recap', 'pnpm build'], q: 'Intl.RelativeTimeFormat', grep: 'recap' } ] },
-  { name: 'Sage', source: 'claude-code', model: 'claude-haiku', fur: '#c75b28', desk: 3, bed: 3, quests: [
-    { title: 'Phase 0 hooks logger', repo: 'github.com/foxhole-hq/foxhole-hq', files: ['packages/plugin-claude/hooks/hooks.json', 'packages/agent/src/normalize.ts', 'packages/agent/src/batch.ts'], cmds: ['node scripts/replay.mjs', 'pnpm test agent'], q: 'Claude Code PostToolUse hook input', grep: 'tool_name' },
-    { title: 'Collapse repeated Read events', repo: 'github.com/foxhole-hq/foxhole-hq', files: ['packages/agent/src/batch.ts', 'packages/agent/test/batch.test.ts'], cmds: ['pnpm test batch', 'pnpm typecheck'], q: 'debounce vs throttle batching', grep: 'flush' } ] },
-];
-const rid = () => Math.random().toString(16).slice(2, 6);
-let foxes = [], uid = 0;
-function makeFox(o) {
-  const f = Object.assign({ id: ++uid, x: 5, y: 4.5, path: [], travel: false, target: null, dir: 1, state: 'idle', act: null,
-    timer: 0, cur: null, steps: [], tIn: 0, tOut: 0, qIn: 0, qOut: 0, events: [], quest: null, qi: 0, done: 0,
-    qTools: 0, qErrors: 0, phase: R() * 10, scale: 1, pop: 1, scroll: 0, speed: 2.4, zT: 0,
-    machine: 'm_8f2c', session: 's_' + rid() + rid() }, o);
-  f.dark = f.arctic ? '#6f7d88' : '#3a2418';
-  f.shade = f.arctic ? '#aeb9c2' : tone(f.fur, 0.82);
-  f.cream = f.arctic ? '#ffffff' : '#f6e7cf';
-  return f;
-}
-AGENTS.forEach((a, i) => foxes.push(makeFox(a)));
-const [ember, juniper, moss, sage] = foxes;
-ember.x = 4.2; ember.y = 4.4; ember.cur = { k: 'boot' }; ember.timer = 0.4;
-juniper.x = 5.6; juniper.y = 3.6; juniper.cur = { k: 'boot' }; juniper.timer = 1.6;
-moss.x = 6.4; moss.y = 5.2; moss.cur = { k: 'boot' }; moss.timer = 3.4;
-[ember, juniper, moss].forEach(f => f.steps = [{ k: 'start' }]);
-Object.assign(sage, ST.bed(3)); sage.state = 'sleeping'; sage.cur = { k: 'rest' }; sage.timer = 24; sage.steps = [{ k: 'start' }];
-
-function planQuest(f) {
-  const Q = f.quests[f.qi++ % f.quests.length], s = [{ k: 'prompt', quest: Q }];
-  const T = (tool, target, extra = {}) => s.push({ k: 'tool', tool, target, ...extra });
-  if (f.quick) {
-    f.quick = false;
-    T('Read', Q.files[0]); T('Edit', Q.files[0]); T('Bash', Q.cmds[0], { perm: true }); T('Task', 'explore ' + dir(Q.files[1]));
-    T('Edit', Q.files[1]); T('Bash', Q.cmds[1]); s.push({ k: 'stop' });
-    return s;
-  }
-  T('Read', Q.files[0]);
-  if (R() < 0.65) T('Grep', Q.grep);
-  if (R() < 0.55) T('WebSearch', Q.q);
-  T('Edit', Q.files[0]);
-  if (R() < 0.55) T('Task', 'explore ' + dir(Q.files[1]));
-  T('Edit', Q.files[1]);
-  T('Bash', Q.cmds[0], { perm: R() < 0.7 });
-  if (R() < 0.5) T('Write', Q.files[2] || Q.files[1]);
-  T('Bash', Q.cmds[1]);
-  s.push({ k: 'stop' });
-  return s;
-}
-const dir = p => p.split('/').slice(-2, -1)[0] || p;
-
-/* ---------- world state ---------- */
-let simT = 0, speed = 1, xp = 520, level = 7, trophies = 3;
-const parts = [];
-const xpNeed = l => 300 + l * 90;
-let hideTargets = false, selected = ember;
-const seen = new Set();
-
-function spotFor(f, st) {
-  if (st === 'desk') return { ...ST.desk(f.desk), st };
-  if (st === 'bed') return { ...ST.bed(f.bed), st };
-  const n = foxes.filter(o => o !== f && o.target && o.target.st === st).length;
-  return { ...ST[st](n), st };
-}
-function goTo(f, sp) { f.target = sp; f.path = findPath(f.x, f.y, sp.x, sp.y); f.travel = true; f.state = 'walking'; }
-
-function usage(f, scale = 1) {
-  const u = { inputTokens: Math.round(rnd(900, 4200) * scale), outputTokens: Math.round(rnd(120, 900) * scale), model: f.model };
-  f.tIn += u.inputTokens; f.tOut += u.outputTokens; f.qIn += u.inputTokens; f.qOut += u.outputTokens;
-  if (f.parent) { f.parent.tIn += u.inputTokens; f.parent.tOut += u.outputTokens; f.parent.qIn += u.inputTokens; f.parent.qOut += u.outputTokens; }
-  return u;
-}
-function emit(f, type, extra = {}) {
-  const ev = { v: 1, ts: new Date().toISOString(), source: f.source, machineId: f.machine, sessionId: f.session,
-    parentSessionId: f.parent ? f.parent.session : null, type, ...extra };
-  if (f.quest && f.quest.repo) ev.repo = f.quest.repo;
-  (f.parent || f).events.push({ ev, cub: !!f.parent });
-  const evs = (f.parent || f).events; if (evs.length > 50) evs.shift();
-  logEvent(f, ev);
-  return ev;
-}
-
-function begin(f, s) {
-  f.cur = s;
-  switch (s.k) {
-    case 'start':
-      f.session = 's_' + rid() + rid();
-      emit(f, 'session.start', {});
-      f.state = 'idle'; f.timer = 1.1; f.steps = planQuest(f);
-      break;
-    case 'prompt':
-      f.quest = s.quest; f.qIn = 0; f.qOut = 0; f.qTools = 0; f.qErrors = 0; f.qStart = simT;
-      emit(f, 'prompt.submit', {});
-      f.state = 'idle'; f.scroll = 1.9; f.timer = 1.9;
-      break;
-    case 'tool': {
-      const m = TOOL[s.tool]; s.act = m.act; s.dur = rnd(...m.d);
-      if (!s.perm) emit(f, 'tool.start', { tool: s.tool, target: s.target, status: 'ok', usage: usage(f) });
-      f.qTools++;
-      goTo(f, spotFor(f, m.st));
-      break;
-    }
-    case 'stop': {
-      f.state = 'celebrating'; f.timer = 2.8; f.done++;
-      emit(f, 'session.stop', { status: 'ok', usage: { inputTokens: f.qIn, outputTokens: f.qOut, model: f.model } });
-      const gain = 30 + f.qTools * 9 + (f.qErrors ? 0 : 20);
-      addXp(gain, f);
-      burst(f, 'confetti', reduceMotion ? 10 : 46);
-      if (!f.qErrors && !seen.has('zero')) { seen.add('zero'); unlock('Zero-Error Shift', `${f.name} finished a quest with no tool errors.`); }
-      if (!seen.has('first')) { seen.add('first'); unlock('First Quest', `${f.name} closed out “${f.quest.title}”.`); }
-      break;
-    }
-    case 'wander': goTo(f, { x: rnd(3.5, 6.8), y: rnd(3.4, 5.6), face: R() < 0.5 ? 1 : -1, st: 'rug' }); break;
-    case 'rest': goTo(f, spotFor(f, 'bed')); break;
-    case 'home': goTo(f, spotFor(f, 'burrow')); break;
-  }
-}
-function arrive(f) {
-  const s = f.cur; f.target = s && s.k === 'tool' ? f.target : null;
-  if (!s) return;
-  if (s.k === 'tool') {
-    if (s.perm) {
-      f.state = 'waiting'; f.waitSince = simT;
-      emit(f, 'permission.request', { tool: s.tool, target: s.target, status: 'waiting' });
-      if (!seen.has('perm-hint')) { seen.add('perm-hint'); toast(`${f.name} raised a paw`, 'This is where your phone would buzz. Approve it in the bar below.'); }
-    } else startWork(f, s);
-  } else if (s.k === 'wander') { f.state = 'idle'; f.timer = rnd(1.4, 2.6); }
-  else if (s.k === 'rest') {
-    f.state = 'sleeping'; f.timer = rnd(18, 30); f.steps = [{ k: 'start' }];
-    emit(f, 'session.end', {});
-  } else if (s.k === 'home') {
-    emit(f, 'subagent.stop', { status: 'ok' });
-    burst(f, 'smoke', 6);
-    foxes = foxes.filter(o => o !== f);
-  }
-}
-function startWork(f, s) {
-  f.state = 'working'; f.act = s.act; f.timer = s.dur;
-  if (s.tool === 'Task') spawnCub(f);
-}
-function timerDone(f) {
-  const s = f.cur;
-  if (s && s.k === 'tool' && f.state === 'working' && s.tool !== 'Task' && R() < 0.08) {
-    emit(f, 'tool.end', { tool: s.tool, target: s.target, status: 'error' });
-    f.qErrors++; f.state = 'stumble'; f.timer = 1.2; f.cur = { k: 'stumbled' }; f.target = null;
-    burst(f, 'smoke', 10);
-    return;
-  }
-  if (s && s.k === 'tool') f.target = null;
-  if (s && s.k === 'stop') f.steps = R() < 0.55 && !f.isCub ? [{ k: 'wander' }, ...planQuest(f)] : [{ k: 'rest' }];
-  f.cur = null;
-  if (f.state !== 'sleeping') { f.state = 'idle'; f.act = null; }
-}
-function advance(f) {
-  const s = f.steps.shift();
-  if (s) begin(f, s); else if (!f.isCub) begin(f, { k: 'rest' });
-}
-function spawnCub(p) {
-  p.cubs = (p.cubs || 0) + 1;
-  const c = makeFox({ name: p.name, source: p.source, model: p.model, fur: p.fur, arctic: p.arctic, isCub: true, parent: p,
-    quest: p.quest, scale: 0.6, speed: 3.3, x: 9.25, y: 6.75, machine: p.machine });
-  c.steps = [{ k: 'tool', tool: 'Read', target: p.quest.files[1] }, { k: 'tool', tool: 'Grep', target: p.quest.grep }, { k: 'tool', tool: 'Bash', target: 'ls ' + dir(p.quest.files[1]) }, { k: 'home' }];
-  c.timer = 0.6; c.cur = { k: 'boot' };
-  foxes.push(c); burst(c, 'smoke', 6);
-  if (p.cubs === 2 && !seen.has('cub')) { seen.add('cub'); unlock('Cub Wrangler 2/5', `${p.name} has sent out two cubs today.`); }
-}
-function decide(f, ok) {
-  const s = f.cur, waited = simT - f.waitSince;
-  noteLine(`You ${ok ? 'approved' : 'denied'} ${f.name}: ${s.tool} ${fmtTarget(s.target)} after ${waited.toFixed(1)}s`);
-  if (ok) {
-    emit(f, 'tool.start', { tool: s.tool, target: s.target, status: 'ok', usage: usage(f) });
-    startWork(f, s);
-    if (waited < 6 && !seen.has('quick')) { seen.add('quick'); unlock('Quick Paw', `Answered ${f.name} in ${waited.toFixed(1)}s.`); }
-  } else {
-    emit(f, 'tool.end', { tool: s.tool, target: s.target, status: 'error' });
-    f.qErrors++; f.state = 'stumble'; f.timer = 1.2; f.cur = { k: 'stumbled' }; f.target = null;
-    burst(f, 'smoke', 10);
-  }
-  renderAlert();
-}
-function addXp(n, f) {
-  xp += n;
-  const [sx, sy] = iso(f.x, f.y);
-  parts.push({ kind: 'xp', x: sx, y: sy - 70, vx: 0, vy: -26, life: 2.2, max: 2.2, text: `+${n} XP` });
-  while (xp >= xpNeed(level)) { xp -= xpNeed(level); level++; trophies = Math.min(5, trophies + 1); unlock(`Level ${level}`, 'New decor unlocked: a trophy for the shelf.'); }
-}
-function burst(f, kind, n) {
-  const [sx, sy] = iso(f.x, f.y);
-  const colors = [COL.fox, COL.alert, COL.ok, '#8fc4ff', '#f3a0c4'];
-  for (let i = 0; i < n; i++) {
-    if (kind === 'confetti') parts.push({ kind, x: sx + rnd(-6, 6), y: sy - 30, vx: rnd(-90, 90), vy: rnd(-230, -110), life: rnd(1.2, 2), max: 2, color: colors[i % colors.length], rot: R() * TAU });
-    else parts.push({ kind, x: sx + rnd(-10, 10), y: sy - rnd(8, 22), vx: rnd(-14, 14), vy: rnd(-34, -18), life: rnd(0.8, 1.4), max: 1.4, r: rnd(4, 8) });
-  }
-}
-
-/* ---------- simulation tick ---------- */
-function tick(dt) {
-  for (const f of [...foxes]) {
-    if (f.pop < 1) f.pop = Math.min(1, f.pop + dt * 2.2);
-    if (f.scroll > 0) f.scroll -= dt;
-    if (f.state === 'sleeping') { f.zT -= dt; if (f.zT <= 0) { f.zT = 1.3; const [sx, sy] = iso(f.x, f.y); parts.push({ kind: 'z', x: sx + 8, y: sy - 20, vx: 8, vy: -16, life: 2.2, max: 2.2 }); } }
-    if (f.travel) {
-      const p = f.path[0], dx = p[0] - f.x, dy = p[1] - f.y, d = Math.hypot(dx, dy), step = f.speed * dt;
-      if (Math.abs(dx - dy) > 0.01) f.dir = dx - dy > 0 ? 1 : -1;
-      if (d <= step) {
-        f.x = p[0]; f.y = p[1]; f.path.shift();
-        if (!f.path.length) { f.travel = false; if (f.target && f.target.face) f.dir = f.target.face; arrive(f); }
-      } else { f.x += dx / d * step; f.y += dy / d * step; }
-      continue;
-    }
-    if (f.state === 'waiting') { if (simT - f.waitSince > 25) decide(f, true); continue; }
-    if (f.timer > 0) { f.timer -= dt; if (f.timer <= 0) timerDone(f); continue; }
-    if (!f.cur) advance(f);
-  }
-  for (let i = parts.length - 1; i >= 0; i--) {
-    const p = parts[i];
-    p.x += p.vx * dt; p.y += p.vy * dt; p.life -= dt;
-    if (p.kind === 'confetti') { p.vy += 300 * dt; p.rot += dt * 8; }
-    if (p.life <= 0) parts.splice(i, 1);
-  }
-}
-
-/* ---------- drawing ---------- */
-function drawRoom(t) {
-  for (let i = 0; i < COLS; i++) for (let j = 0; j < ROWS; j++)
-    poly([iso(i, j), iso(i + 1, j), iso(i + 1, j + 1), iso(i, j + 1)], (i + j) % 2 ? P.floorA : P.floorB);
-  poly([iso(3, 3), iso(7.4, 3), iso(7.4, 6), iso(3, 6)], P.rug);
-  poly([iso(3.25, 3.2), iso(7.15, 3.2), iso(7.15, 5.8), iso(3.25, 5.8)], P.rugIn);
-  poly([iso(3.45, 3.4), iso(6.95, 3.4), iso(6.95, 5.6), iso(3.45, 5.6)], P.rug);
-
-  poly([iso(0, 0), iso(COLS, 0), iso(COLS, 0, WH), iso(0, 0, WH)], P.wallR);
-  poly([iso(0, 0), iso(0, ROWS), iso(0, ROWS, WH), iso(0, 0, WH)], P.wallL);
-  for (let x = 1; x < COLS; x++) line(iso(x, 0), iso(x, 0, WH), 'rgba(0,0,0,.13)');
-  for (let y = 1; y < ROWS; y++) line(iso(0, y), iso(0, y, WH), 'rgba(0,0,0,.13)');
-  poly([iso(0, 0), iso(COLS, 0), iso(COLS, 0, 6), iso(0, 0, 6)], P.base);
-  poly([iso(0, 0), iso(0, ROWS), iso(0, ROWS, 6), iso(0, 0, 6)], P.base);
-  ctx.lineJoin = 'round'; ctx.strokeStyle = P.base; ctx.lineWidth = 4; ctx.beginPath();
-  ctx.moveTo(...iso(0, ROWS, WH)); ctx.lineTo(...iso(0, 0, WH)); ctx.lineTo(...iso(COLS, 0, WH)); ctx.stroke();
-
-  // window, sky follows local time
-  const h = new Date().getHours(), night = h < 6 || h >= 20, dusk = (h >= 17 && h < 20) || (h >= 6 && h < 8);
-  const x0 = 8.4, x1 = 10.2, z0 = 34, z1 = 82;
-  poly([iso(x0, 0, z0), iso(x1, 0, z0), iso(x1, 0, z1), iso(x0, 0, z1)], night ? '#1b2a4d' : dusk ? '#e39a6c' : '#8cc6e6');
-  if (night) stars.forEach(([sx, sz, ph]) => { const p = iso(sx, 0, sz); ctx.fillStyle = `rgba(255,248,220,${0.45 + 0.45 * Math.sin(t * 1.5 + ph)})`; ctx.fillRect(p[0], p[1], 1.6, 1.6); });
-  const m = iso(9.75, 0, 72); ell(m[0], m[1], 5.5, 5.5, night ? '#f2ead0' : '#ffd77e');
-  ctx.strokeStyle = P.base; ctx.lineWidth = 3; ctx.beginPath();
-  [iso(x0, 0, z0), iso(x1, 0, z0), iso(x1, 0, z1), iso(x0, 0, z1)].forEach((p, i) => i ? ctx.lineTo(...p) : ctx.moveTo(...p)); ctx.closePath(); ctx.stroke();
-  line(iso(9.3, 0, z0), iso(9.3, 0, z1), P.base, 2); line(iso(x0, 0, 58), iso(x1, 0, 58), P.base, 2);
-  box(8.3, 0, 2.0, 0.16, 3, 31, B(P.shelf));
-
-  // quest board on the left wall: one note per active quest
-  poly([iso(0, 0.7, 30), iso(0, 2.6, 30), iso(0, 2.6, 76), iso(0, 0.7, 76)], P.cork);
-  ctx.strokeStyle = tone(P.cork, 0.6); ctx.lineWidth = 2; ctx.beginPath();
-  [iso(0, 0.7, 30), iso(0, 2.6, 30), iso(0, 2.6, 76), iso(0, 0.7, 76)].forEach((p, i) => i ? ctx.lineTo(...p) : ctx.moveTo(...p)); ctx.closePath(); ctx.stroke();
-  foxes.filter(f => !f.isCub && f.quest && f.state !== 'sleeping').slice(0, 4).forEach((f, i) => {
-    const y = 0.85 + (i % 2) * 0.88, z = i < 2 ? 70 : 50;
-    poly([iso(0, y, z), iso(0, y + 0.7, z), iso(0, y + 0.7, z - 16), iso(0, y, z - 16)], '#f1e4c6');
-    for (let l = 0; l < 3; l++) line(iso(0, y + 0.1, z - 5 - l * 3.5), iso(0, y + 0.2 + 0.35 * ((l + i) % 3 / 2 + 0.3), z - 5 - l * 3.5), 'rgba(80,60,40,.5)', 1);
-    const pin = iso(0, y + 0.35, z - 1); ell(pin[0], pin[1], 2.2, 2.2, f.fur);
-  });
-
-  // trophy shelf above the desks
-  box(1.0, 0, 2.4, 0.26, 3, 78, B(P.shelf));
-  for (let i = 0; i < trophies; i++) {
-    const p = iso(1.3 + i * 0.45, 0.13, 81);
-    ctx.fillStyle = P.gold; ctx.fillRect(p[0] - 4, p[1] - 2, 8, 2); ctx.fillRect(p[0] - 1, p[1] - 6, 2, 4);
-    ctx.beginPath(); ctx.moveTo(p[0] - 5, p[1] - 12); ctx.lineTo(p[0] + 5, p[1] - 12); ctx.quadraticCurveTo(p[0] + 4, p[1] - 5, p[0], p[1] - 6); ctx.quadraticCurveTo(p[0] - 4, p[1] - 5, p[0] - 5, p[1] - 12); ctx.fill();
-  }
-
-  // burrow
-  const bc = iso(9.9, 6.9); ell(bc[0], bc[1], 40, 20, P.dirt); ell(bc[0], bc[1] + 1, 26, 12, P.hole);
-  // beds
-  [0, 1, 2, 3].forEach(k => { const b = ST.bed(k), c = iso(b.x, b.y); ell(c[0], c[1] + 2, 30, 15, P.cush); ell(c[0], c[1], 22, 10, P.cushIn); });
-  // light beams for foxes that need you
-  foxes.filter(f => f.state === 'waiting').forEach(f => {
-    const [sx, sy] = iso(f.x, f.y), g = ctx.createLinearGradient(0, sy, 0, -WH - 80);
-    const a = 0.22 + 0.08 * Math.sin(t * 4);
-    g.addColorStop(0, `rgba(255,200,87,${a})`); g.addColorStop(1, 'rgba(255,200,87,0)');
-    ctx.fillStyle = g; ctx.fillRect(sx - 16, -WH - 80, 32, sy + WH + 80);
-    ell(sx, sy, 22, 9, `rgba(255,200,87,${a})`);
-  });
-}
-
-function drawDesk(k, t) {
-  const dx = 1.0 + 1.8 * k;
-  box(dx, 0.1, 1.4, 0.75, 22, 0, B(P.desk));
-  const on = foxes.some(f => !f.isCub && f.desk === k && f.state === 'working' && f.act === 'type');
-  box(dx + 0.62, 0.22, 0.16, 0.12, 4, 22, B(P.mon));
-  box(dx + 0.35, 0.2, 0.7, 0.08, 17, 25, B(P.mon));
-  poly([iso(dx + 0.4, 0.285, 27), iso(dx + 1.0, 0.285, 27), iso(dx + 1.0, 0.285, 40), iso(dx + 0.4, 0.285, 40)], on ? P.scrOn : P.scrDim);
-  if (on) {
-    for (let i = 0; i < 4; i++) {
-      const zz = 37 - i * 2.6, len = 0.12 + (Math.sin(t * 3 + i * 2 + k) + 1) / 2 * 0.36;
-      line(iso(dx + 0.45, 0.29, zz), iso(dx + 0.45 + len, 0.29, zz), '#1f5d74', 1.2);
-    }
-    const c = iso(dx + 0.7, 0.4, 32), g = ctx.createRadialGradient(c[0], c[1], 2, c[0], c[1], 46);
-    g.addColorStop(0, 'rgba(155,230,255,.28)'); g.addColorStop(1, 'rgba(155,230,255,0)');
-    ctx.fillStyle = g; ctx.fillRect(c[0] - 46, c[1] - 46, 92, 92);
-  }
-  const mug = iso(dx + 1.2, 0.55, 22); ctx.fillStyle = ['#d9d1c3', '#c2563f', '#4f7cac', '#5c8f5a'][k]; ctx.fillRect(mug[0] - 2.5, mug[1] - 6, 5, 6);
-}
-function drawShelf() {
-  box(0, 3, 0.55, 2, 72, 0, B(P.shelf));
-  poly([iso(0.55, 3.06, 3), iso(0.55, 4.94, 3), iso(0.55, 4.94, 70), iso(0.55, 3.06, 70)], '#45301f');
-  books.forEach(b => poly([iso(0.56, b.y, b.z), iso(0.56, b.y + b.w, b.z), iso(0.56, b.y + b.w, b.z + b.h), iso(0.56, b.y, b.z + b.h)], b.c));
-  [4, 21, 38, 55].forEach(z => line(iso(0.56, 3.06, z), iso(0.56, 4.94, z), tone(P.shelf, 1.1), 2));
-}
-function drawRack(t) {
-  box(0, 5.9, 0.7, 1.1, 80, 0, B(P.rack));
-  const busy = foxes.some(f => f.state === 'working' && f.act === 'bash');
-  for (let u = 0; u < 6; u++) {
-    const z = 8 + u * 12;
-    poly([iso(0.71, 5.97, z), iso(0.71, 6.93, z), iso(0.71, 6.93, z + 9), iso(0.71, 5.97, z + 9)], '#363f46');
-    for (let j = 0; j < 4; j++) {
-      const on = Math.sin(t * (busy ? 16 : 2.5) + u * 1.7 + j * 2.3) > 0.1;
-      const y = 6.05 + j * 0.12;
-      poly([iso(0.72, y, z + 3), iso(0.72, y + 0.06, z + 3), iso(0.72, y + 0.06, z + 6), iso(0.72, y, z + 6)], on ? (j === 3 ? '#ffb347' : '#6ff0a0') : '#22302a');
-    }
-  }
-}
-function drawTelescope() {
-  const top = iso(9.4, 1.05, 28);
-  [iso(9.1, 0.8), iso(9.75, 0.95), iso(9.4, 1.35)].forEach(l => line(top, l, '#5b4330', 2.2));
-  ctx.lineCap = 'round'; line(iso(9.2, 1.15, 25), iso(9.65, 0.6, 46), P.brass, 6); line(iso(9.6, 0.66, 44), iso(9.68, 0.56, 47), '#7a5a2a', 7);
-}
-function drawPlant() {
-  box(10.3, 0.25, 0.5, 0.5, 14, 0, B(P.pot));
-  const c = iso(10.55, 0.5, 14);
-  [[-8, -8, 9], [7, -10, 8], [0, -18, 10], [-4, -26, 7], [6, -24, 6]].forEach(([dx, dy, r], i) => ell(c[0] + dx, c[1] + dy, r, r * 0.8, i % 2 ? P.leaf : tone(P.leaf, 0.8)));
-}
-
-/* pixel sprites (o fur, d fur shade, c cream, k ink), drawn upright in the iso room */
 const norm = rows => { const w = Math.max(...rows.map(r => r.length)); return rows.map(r => r.padEnd(w, '.')); };
 const SPR = {
   sideA: norm(['..........dd.dd.', '..........oo.oo.', '..........ooooo.', '.........ookooc.', '.........oooocck', 'cc......oooocc..', 'ooc.oooooooocc..', '.oooooooooooc...', '..ooooooooocc...', '...doooooood....', '...d.d....d.d...', '...k.k....k.k...']),
@@ -685,6 +300,445 @@ function bubble(cx, bottom, icon, bg, p) {
   ctx.fillStyle = bg; ctx.fillRect(x + p, y + p, bw - 2 * p, bh - 2 * p);
   pix(icon, x + 2 * p, y + 2 * p, { x: INK }, false, p);
   return y;
+}
+
+/* ---------- stations: each branch gets a corner of the room with its own rug and desks; the shared stations hug the walls ---------- */
+const BAREAS = [[3.0, 1.8], [5.8, 1.8], [3.0, 4.4], [5.8, 4.4]];
+const BAW = 2.4, BAH = 2.2, DW = 1.0, DD = 0.6;
+const BCOL = [['#2f4a6b', '#4f78a6'], ['#5d3a6e', '#8b5aa8'], ['#2f5a40', '#4f8f66'], ['#6b4a22', '#a8783a']];
+const areaOf = b => ({ x: BAREAS[b.slot][0], y: BAREAS[b.slot][1] });
+function deskRect(f) { const a = areaOf(f.den.branches[f.bIdx]); return { x: a.x + 0.15 + f.bDesk * 1.1, y: a.y + 0.2 }; }
+const deskSpot = f => { const r = deskRect(f); return { x: r.x + DW / 2, y: r.y + DD + 0.5, face: 1 }; };
+const ST = {
+  shelf: i => [{ x: 1.05, y: 3.6, face: -1 }, { x: 1.1, y: 4.6, face: -1 }, { x: 1.6, y: 4.1, face: -1 }][i % 3],
+  rack: i => [{ x: 1.25, y: 6.45, face: -1 }, { x: 1.45, y: 5.55, face: -1 }, { x: 1.8, y: 7.1, face: -1 }][i % 3],
+  window: i => [{ x: 8.55, y: 1.75, face: 1 }, { x: 9.6, y: 2.4, face: 1 }][i % 2],
+  burrow: i => [{ x: 8.45, y: 6.4, face: 1 }, { x: 8.2, y: 7.05, face: 1 }][i % 2],
+  bed: k => ({ x: [2.4, 4.3, 6.2, 8.0][k % 4], y: 7.75, face: 1 }),
+};
+const BASE_BLOCK = ['0,3', '0,4', '0,5', '0,6', '9,1', '9,6', '10,6', '9,7', '10,7', '10,0', '2,0', '3,0'];
+function rebuildBlocked(d) {
+  d.blocked = new Set(BASE_BLOCK);
+  d.foxes.filter(f => !f.isCub).forEach(f => {
+    const { x, y } = deskRect(f);
+    for (let i = Math.floor(x); i <= Math.floor(x + DW - 0.01); i++) for (let j = Math.floor(y); j <= Math.floor(y + DD - 0.01); j++) d.blocked.add(i + ',' + j);
+  });
+}
+function findPath(d, ax, ay, bx, by) {
+  const k = (x, y) => x + ',' + y, s = [Math.floor(ax), Math.floor(ay)], g = [Math.floor(bx), Math.floor(by)];
+  const prev = new Map([[k(...s), null]]), q = [s];
+  while (q.length) {
+    const [x, y] = q.shift(); if (x === g[0] && y === g[1]) break;
+    for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+      const nx = x + dx, ny = y + dy, nk = k(nx, ny);
+      if (nx < 0 || ny < 0 || nx >= COLS || ny >= ROWS || prev.has(nk)) continue;
+      if (d.blocked.has(nk) && !(nx === g[0] && ny === g[1])) continue;
+      prev.set(nk, [x, y]); q.push([nx, ny]);
+    }
+  }
+  if (!prev.has(k(...g))) return [[bx, by]];
+  const out = []; let c = g;
+  while (c && !(c[0] === s[0] && c[1] === s[1])) { out.unshift([c[0] + 0.5, c[1] + 0.5]); c = prev.get(k(...c)); }
+  if (out.length) out.pop();
+  out.push([bx, by]);
+  return out;
+}
+
+/* ---------- departments and agents ---------- */
+const TOOL = {
+  Read: { st: 'shelf', act: 'read', d: [2.8, 4] }, Grep: { st: 'shelf', act: 'read', d: [2, 3] },
+  Edit: { st: 'desk', act: 'type', d: [4, 6] }, Write: { st: 'desk', act: 'type', d: [3.5, 5] },
+  Bash: { st: 'rack', act: 'bash', d: [3, 4.2] }, WebSearch: { st: 'window', act: 'gaze', d: [3, 4] },
+  Task: { st: 'burrow', act: 'task', d: [1.8, 2.4] },
+};
+const RATES = { 'claude-sonnet': [3, 15], 'claude-opus': [5, 25], 'claude-haiku': [1, 5], 'codex': [1.25, 10] };
+const DEN_DEFS = [
+  { repo: 'github.com/acme/web', agents: [
+    { name: 'Ember', branch: 'fix/session-expiry', source: 'claude-code', model: 'claude-sonnet', fur: '#e8772e', quick: true, quests: [
+      { title: 'Fix session expiry bug', files: ['src/auth/session.ts', 'src/auth/session.test.ts', 'src/middleware/auth.ts'], cmds: ['npm run migrate', 'pnpm test auth'], q: 'jose jwt exp clock skew', grep: 'expiresAt' },
+      { title: 'Add remember-me toggle', files: ['src/auth/LoginForm.tsx', 'src/auth/session.ts', 'src/i18n/en.json'], cmds: ['pnpm test login', 'pnpm typecheck'], q: 'cookie maxAge vs expires', grep: 'rememberMe' } ] },
+    { name: 'Juniper', branch: 'feat/csp-headers', source: 'claude-code', model: 'claude-opus', fur: '#d9973a', quests: [
+      { title: 'Add CSP headers', files: ['src/server/headers.ts', 'src/server/headers.test.ts', 'next.config.mjs'], cmds: ['pnpm test headers', 'pnpm build'], q: 'Content-Security-Policy nonce', grep: 'setHeader' },
+      { title: 'Report CSP violations', files: ['src/server/csp-report.ts', 'src/server/headers.ts'], cmds: ['pnpm test csp', 'pnpm build'], q: 'report-to header CSP', grep: 'report-uri' } ] },
+    { name: 'Sage', branch: 'chore/react-19', source: 'claude-code', model: 'claude-haiku', fur: '#c75b28', asleep: 34, quests: [
+      { title: 'Bump React to 19', files: ['package.json', 'src/main.tsx', 'src/hooks/useFormState.ts'], cmds: ['pnpm install', 'pnpm test'], q: 'React 19 migration useFormState', grep: 'useFormState' },
+      { title: 'Drop legacy context API', files: ['src/theme/ThemeProvider.tsx', 'src/theme/legacy.ts'], cmds: ['pnpm test theme', 'pnpm build'], q: 'React 19 removed legacy context', grep: 'childContextTypes' } ] } ] },
+  { repo: 'github.com/foxhole-hq/foxhole-hq', agents: [
+    { name: 'Rusty', branch: 'feat/pairing', source: 'claude-code', model: 'claude-opus', fur: '#b9562a', quests: [
+      { title: 'Rate-limit the pairing endpoint', files: ['apps/api/src/pair.ts', 'apps/api/src/limiter.ts', 'apps/api/wrangler.toml'], cmds: ['pnpm vitest limiter', 'wrangler deploy --dry-run'], q: 'durable objects rate limiting', grep: 'pairCode' },
+      { title: 'Expire pairing links after use', files: ['apps/api/src/pair.ts', 'apps/api/test/pair.test.ts', 'apps/api/src/den.ts'], cmds: ['pnpm vitest pair', 'pnpm typecheck'], q: 'RFC 8628 device authorization grant', grep: 'expiresAt' } ] },
+    { name: 'Moss', branch: 'feat/stats-zustand', source: 'codex', model: 'codex', fur: '#dfe7ec', arctic: true, quests: [
+      { title: 'Move stats page to Zustand', files: ['apps/web/src/stats/Stats.tsx', 'apps/web/src/store/den.ts', 'apps/web/src/stats/useRecap.ts'], cmds: ['pnpm build', 'pnpm lint'], q: 'zustand subscribeWithSelector', grep: 'useState' },
+      { title: 'Add daily recap card', files: ['apps/web/src/stats/Recap.tsx', 'apps/web/src/store/den.ts'], cmds: ['pnpm test recap', 'pnpm build'], q: 'Intl.RelativeTimeFormat', grep: 'recap' } ] } ],
+    later: [{ at: 26, agent: { name: 'Pip', branch: 'feat/pairing', source: 'claude-code', model: 'claude-sonnet', fur: '#f0a05f', quests: [
+      { title: 'Show a QR code for pairing', files: ['apps/web/src/pair/QrCode.tsx', 'apps/web/src/pair/usePair.ts'], cmds: ['pnpm test pair', 'pnpm build'], q: 'qrcode svg generator', grep: 'pairUrl' },
+      { title: 'Expired pairing link page', files: ['apps/web/src/pair/Expired.tsx', 'apps/web/src/pair/usePair.ts'], cmds: ['pnpm test pair', 'pnpm typecheck'], q: 'friendly expired link copy', grep: 'expired' } ] } }] },
+  { repo: 'github.com/acme/billing-api', agents: [
+    { name: 'Fern', branch: 'fix/webhook-retry', source: 'claude-code', model: 'claude-haiku', fur: '#cf6a2c', restful: true, quests: [
+      { title: 'Retry failed webhooks', files: ['src/webhooks/dispatch.ts', 'src/webhooks/retry.ts', 'test/webhooks.test.ts'], cmds: ['npm test webhooks', 'npm run lint'], q: 'exponential backoff with jitter', grep: 'dispatchWebhook' },
+      { title: 'Dead-letter queue for webhooks', files: ['src/webhooks/dlq.ts', 'src/webhooks/retry.ts'], cmds: ['npm test dlq', 'npm run build'], q: 'dead letter queue pattern', grep: 'maxAttempts' } ] } ] },
+];
+const rid = () => Math.random().toString(16).slice(2, 6);
+function makeFox(o, den) {
+  const f = Object.assign({ den, x: 5, y: 6.6, path: [], travel: false, target: null, dir: 1, state: 'idle', act: null,
+    timer: 0, cur: null, steps: [], tIn: 0, tOut: 0, qIn: 0, qOut: 0, events: [], quest: null, qi: 0, done: 0,
+    qTools: 0, qErrors: 0, phase: R() * 10, scale: 1, scroll: 0, speed: 2.4, zT: 0,
+    machine: 'm_8f2c', session: 's_' + rid() + rid() }, o);
+  f.shade = f.arctic ? '#aeb9c2' : tone(f.fur, 0.82);
+  f.cream = f.arctic ? '#ffffff' : '#f6e7cf';
+  return f;
+}
+function addAgent(d, a) {
+  let bIdx = d.branches.findIndex(b => b.name === a.branch);
+  if (bIdx < 0) { d.branches.push({ name: a.branch, slot: d.branches.length, col: BCOL[d.branches.length % 4], foxes: [] }); bIdx = d.branches.length - 1; }
+  const br = d.branches[bIdx], f = makeFox({ ...a, bIdx, bDesk: br.foxes.length, bed: d.foxes.filter(o => !o.isCub).length % 4 }, d);
+  br.foxes.push(f); d.foxes.push(f); rebuildBlocked(d);
+  return f;
+}
+const DENS = DEN_DEFS.map((def, i) => {
+  const d = { id: 'd' + i, idx: i, repo: def.repo, name: def.repo.replace('github.com/', ''), ox: SLOTS[i][0], oy: SLOTS[i][1],
+    rug: RUGS[i], foxes: [], parts: [], branches: [], later: def.later || [] };
+  def.agents.forEach(a => addAgent(d, a));
+  d.foxes.forEach((f, j) => {
+    if (f.asleep) { Object.assign(f, ST.bed(f.bed)); f.state = 'sleeping'; f.cur = { k: 'rest' }; f.timer = f.asleep; }
+    else { f.x = 3 + j * 1.7; f.y = 6.7; f.cur = { k: 'boot' }; f.timer = 0.4 + j * 1.5 + i * 0.8; }
+    f.steps = [{ k: 'start' }];
+  });
+  return d;
+});
+const wpos = f => isoAbs(f.x + f.den.ox, f.y + f.den.oy);
+function join(d, a) {
+  const isNew = !d.branches.some(b => b.name === a.branch);
+  const f = addAgent(d, a), mate = d.branches[f.bIdx].foxes.find(o => o !== f);
+  f.x = 5.2; f.y = 8.6; f.cur = { k: 'boot' }; f.timer = 0.4; f.steps = [{ k: 'start' }];
+  const s = deskSpot(f); burst({ den: d, x: s.x, y: s.y - 0.9 }, 'smoke', 12);
+  toast(`New agent in ${d.name}`, isNew ? `${f.name} started ${a.branch} and got a new branch corner.` : `${f.name} joined ${a.branch} and got the desk next to ${mate.name}.`);
+  buildDepts();
+}
+
+function planQuest(f) {
+  const Q = f.quests[f.qi++ % f.quests.length], s = [{ k: 'prompt', quest: Q }];
+  const T = (tool, target, extra = {}) => s.push({ k: 'tool', tool, target, ...extra });
+  if (f.quick) {
+    f.quick = false;
+    T('Read', Q.files[0]); T('Edit', Q.files[0]); T('Bash', Q.cmds[0], { perm: true }); T('Task', 'explore ' + dir(Q.files[1]));
+    T('Edit', Q.files[1]); T('Bash', Q.cmds[1]); s.push({ k: 'stop' });
+    return s;
+  }
+  T('Read', Q.files[0]);
+  if (R() < 0.65) T('Grep', Q.grep);
+  if (R() < 0.55) T('WebSearch', Q.q);
+  T('Edit', Q.files[0]);
+  if (R() < 0.5) T('Task', 'explore ' + dir(Q.files[1]));
+  T('Edit', Q.files[1]);
+  T('Bash', Q.cmds[0], { perm: R() < 0.55 });
+  if (R() < 0.5) T('Write', Q.files[2] || Q.files[1]);
+  T('Bash', Q.cmds[1]);
+  s.push({ k: 'stop' });
+  return s;
+}
+const dir = p => p.split('/').slice(-2, -1)[0] || p;
+
+/* ---------- simulation ---------- */
+let simT = 0, speed = 1, paused = false, xp = 520, level = 7, trophies = 3;
+let hideTargets = false, selected = null;
+const seen = new Set();
+const xpNeed = l => 300 + l * 90;
+
+function spotFor(f, st) {
+  if (st === 'desk') return { ...deskSpot(f), st };
+  if (st === 'bed') return { ...ST.bed(f.bed), st };
+  const n = f.den.foxes.filter(o => o !== f && o.target && o.target.st === st).length;
+  return { ...ST[st](n), st };
+}
+function goTo(f, sp) { f.target = sp; f.path = findPath(f.den, f.x, f.y, sp.x, sp.y); f.travel = true; f.state = 'walking'; }
+function usage(f) {
+  const u = { inputTokens: Math.round(rnd(900, 4200)), outputTokens: Math.round(rnd(120, 900)), model: f.model };
+  for (const o of f.parent ? [f, f.parent] : [f]) { o.tIn += u.inputTokens; o.tOut += u.outputTokens; o.qIn += u.inputTokens; o.qOut += u.outputTokens; }
+  return u;
+}
+function emit(f, type, extra = {}) {
+  const ev = { v: 1, ts: new Date().toISOString(), source: f.source, machineId: f.machine, sessionId: f.session,
+    parentSessionId: f.parent ? f.parent.session : null, type, ...extra, repo: f.den.repo, branch: (f.parent || f).branch };
+  const owner = f.parent || f;
+  owner.events.push({ ev, cub: !!f.parent }); if (owner.events.length > 50) owner.events.shift();
+  logEvent(f, ev);
+}
+function begin(f, s) {
+  f.cur = s;
+  switch (s.k) {
+    case 'start':
+      f.session = 's_' + rid() + rid();
+      emit(f, 'session.start');
+      f.state = 'idle'; f.timer = 1.1; f.steps = planQuest(f);
+      break;
+    case 'prompt':
+      f.quest = s.quest; f.qIn = 0; f.qOut = 0; f.qTools = 0; f.qErrors = 0; f.qStart = simT;
+      emit(f, 'prompt.submit');
+      f.state = 'idle'; f.scroll = 1.9; f.timer = 1.9;
+      break;
+    case 'tool': {
+      const m = TOOL[s.tool]; s.act = m.act; s.dur = rnd(...m.d);
+      if (!s.perm) emit(f, 'tool.start', { tool: s.tool, target: s.target, status: 'ok', usage: usage(f) });
+      f.qTools++;
+      goTo(f, spotFor(f, m.st));
+      break;
+    }
+    case 'stop':
+      f.state = 'celebrating'; f.timer = 2.8; f.done++;
+      emit(f, 'session.stop', { status: 'ok', usage: { inputTokens: f.qIn, outputTokens: f.qOut, model: f.model } });
+      addXp(30 + f.qTools * 9 + (f.qErrors ? 0 : 20), f);
+      burst(f, 'confetti', reduceMotion ? 10 : 46);
+      if (!seen.has('first')) { seen.add('first'); toast('Achievement: First Quest', `${f.name} closed out “${f.quest.title}” in ${f.den.name}.`); }
+      else if (!f.qErrors && !seen.has('zero')) { seen.add('zero'); toast('Achievement: Zero-Error Shift', `${f.name} finished a quest with no tool errors.`); }
+      break;
+    case 'wander': goTo(f, { x: rnd(2.6, 7.6), y: rnd(6.4, 7.0), face: R() < 0.5 ? 1 : -1, st: 'rug' }); break;
+    case 'rest': goTo(f, spotFor(f, 'bed')); break;
+    case 'home': goTo(f, spotFor(f, 'burrow')); break;
+  }
+}
+function arrive(f) {
+  const s = f.cur; if (!s) return;
+  if (s.k === 'tool') {
+    if (s.perm) { f.state = 'waiting'; f.waitSince = simT; emit(f, 'permission.request', { tool: s.tool, target: s.target, status: 'waiting' }); }
+    else startWork(f, s);
+  } else if (s.k === 'wander') { f.state = 'idle'; f.target = null; f.timer = rnd(1.4, 2.6); }
+  else if (s.k === 'rest') { f.state = 'sleeping'; f.target = null; f.timer = rnd(18, 30); f.steps = [{ k: 'start' }]; emit(f, 'session.end'); }
+  else if (s.k === 'home') { emit(f, 'subagent.stop', { status: 'ok' }); burst(f, 'smoke', 6); f.den.foxes = f.den.foxes.filter(o => o !== f); }
+}
+function startWork(f, s) { f.state = 'working'; f.act = s.act; f.timer = s.dur; if (s.tool === 'Task') spawnCub(f); }
+function fail(f) { f.qErrors++; f.state = 'stumble'; f.timer = 1.2; f.cur = { k: 'stumbled' }; f.target = null; burst(f, 'smoke', 10); }
+function timerDone(f) {
+  const s = f.cur;
+  if (s && s.k === 'tool' && f.state === 'working' && s.tool !== 'Task' && R() < 0.08) {
+    emit(f, 'tool.end', { tool: s.tool, target: s.target, status: 'error' }); fail(f); return;
+  }
+  if (s && s.k === 'tool') f.target = null;
+  if (s && s.k === 'stop') f.steps = R() < (f.restful ? 0.3 : 0.55) ? [{ k: 'wander' }, ...planQuest(f)] : [{ k: 'rest' }];
+  f.cur = null;
+  if (f.state !== 'sleeping') { f.state = 'idle'; f.act = null; }
+}
+function advance(f) { const s = f.steps.shift(); if (s) begin(f, s); else if (!f.isCub) begin(f, { k: 'rest' }); }
+function spawnCub(p) {
+  const c = makeFox({ name: p.name, source: p.source, model: p.model, fur: p.fur, arctic: p.arctic, isCub: true, parent: p,
+    quest: p.quest, scale: 0.6, speed: 3.3, x: 9.25, y: 6.75, machine: p.machine }, p.den);
+  c.steps = [{ k: 'tool', tool: 'Read', target: p.quest.files[1] }, { k: 'tool', tool: 'Grep', target: p.quest.grep }, { k: 'tool', tool: 'Bash', target: 'ls ' + dir(p.quest.files[1]) }, { k: 'home' }];
+  c.timer = 0.6; c.cur = { k: 'boot' };
+  p.den.foxes.push(c); burst(c, 'smoke', 6);
+}
+function decide(f, ok) {
+  const s = f.cur, waited = simT - f.waitSince;
+  noteLine(f, `You ${ok ? 'approved' : 'denied'} ${f.name}'s ${s.tool} ${fmtTarget(s.target)} after ${waited.toFixed(1)}s (in the HQ UI, not a plugin event)`);
+  if (ok) {
+    emit(f, 'tool.start', { tool: s.tool, target: s.target, status: 'ok', usage: usage(f) });
+    startWork(f, s);
+    if (waited < 6 && !seen.has('quick')) { seen.add('quick'); toast('Achievement: Quick Paw', `Answered ${f.name} in ${waited.toFixed(1)}s.`); }
+  } else { emit(f, 'tool.end', { tool: s.tool, target: s.target, status: 'error' }); fail(f); }
+  renderAlert();
+}
+function addXp(n, f) {
+  xp += n;
+  const [sx, sy] = wpos(f);
+  f.den.parts.push({ kind: 'xp', x: sx, y: sy - 70, vx: 0, vy: -26, life: 2.2, max: 2.2, text: `+${n} XP` });
+  while (xp >= xpNeed(level)) { xp -= xpNeed(level); level++; trophies = Math.min(6, trophies + 1); toast(`Level ${level}`, 'A new trophy went into the Commons cabinet.'); }
+}
+function burst(f, kind, n) {
+  const [sx, sy] = wpos(f), colors = [COL.fox, COL.alert, COL.ok, '#8fc4ff', '#f3a0c4'];
+  for (let i = 0; i < n; i++) {
+    if (kind === 'confetti') f.den.parts.push({ kind, x: sx + rnd(-6, 6), y: sy - 30, vx: rnd(-90, 90), vy: rnd(-230, -110), life: rnd(1.2, 2), max: 2, color: colors[i % colors.length], rot: R() * TAU });
+    else f.den.parts.push({ kind, x: sx + rnd(-10, 10), y: sy - rnd(8, 22), vx: rnd(-14, 14), vy: rnd(-34, -18), life: rnd(0.8, 1.4), max: 1.4, r: rnd(4, 8) });
+  }
+}
+function tick(dt) {
+  for (const d of DENS) {
+    for (const j of d.later) if (!j.done && simT >= j.at) { j.done = true; join(d, j.agent); }
+    for (const f of [...d.foxes]) {
+      if (f.scroll > 0) f.scroll -= dt;
+      if (f.state === 'sleeping') { f.zT -= dt; if (f.zT <= 0) { f.zT = 1.3; const [sx, sy] = wpos(f); d.parts.push({ kind: 'z', x: sx + 8, y: sy - 20, vx: 8, vy: -16, life: 2.2, max: 2.2 }); } }
+      if (f.travel) {
+        const p = f.path[0], dx = p[0] - f.x, dy = p[1] - f.y, dist = Math.hypot(dx, dy), step = f.speed * dt;
+        if (Math.abs(dx - dy) > 0.01) f.dir = dx - dy > 0 ? 1 : -1;
+        if (dist <= step) {
+          f.x = p[0]; f.y = p[1]; f.path.shift();
+          if (!f.path.length) { f.travel = false; if (f.target && f.target.face) f.dir = f.target.face; arrive(f); }
+        } else { f.x += dx / dist * step; f.y += dy / dist * step; }
+        continue;
+      }
+      if (f.state === 'waiting') { if (simT - f.waitSince > 25) decide(f, true); continue; }
+      if (f.timer > 0) { f.timer -= dt; if (f.timer <= 0) timerDone(f); continue; }
+      if (!f.cur) advance(f);
+    }
+    for (let i = d.parts.length - 1; i >= 0; i--) {
+      const p = d.parts[i];
+      p.x += p.vx * dt; p.y += p.vy * dt; p.life -= dt;
+      if (p.kind === 'confetti') { p.vy += 300 * dt; p.rot += dt * 8; }
+      if (p.life <= 0) d.parts.splice(i, 1);
+    }
+  }
+}
+
+/* ---------- drawing: building shell ---------- */
+function windowOnBack(x0, x1, t) {
+  const h = new Date().getHours(), night = h < 6 || h >= 20, dusk = (h >= 17 && h < 20) || (h >= 6 && h < 8);
+  const z0 = 34, z1 = 82, pts = [iso(x0, 0, z0), iso(x1, 0, z0), iso(x1, 0, z1), iso(x0, 0, z1)];
+  poly(pts, night ? '#1b2a4d' : dusk ? '#e39a6c' : '#8cc6e6');
+  if (night) stars.forEach(([u, sz, ph]) => { const p = iso(x0 + 0.1 + u * (x1 - x0 - 0.2), 0, sz); ctx.fillStyle = `rgba(255,248,220,${0.45 + 0.45 * Math.sin(t * 1.5 + ph)})`; ctx.fillRect(p[0], p[1], 1.6, 1.6); });
+  const m = iso(x1 - 0.45, 0, 72); ell(m[0], m[1], 5.5, 5.5, night ? '#f2ead0' : '#ffd77e');
+  ctx.strokeStyle = P.base; ctx.lineWidth = 3; ctx.beginPath(); pts.forEach((p, i) => i ? ctx.lineTo(...p) : ctx.moveTo(...p)); ctx.closePath(); ctx.stroke();
+  const mid = (x0 + x1) / 2; line(iso(mid, 0, z0), iso(mid, 0, z1), P.base, 2); line(iso(x0, 0, 58), iso(x1, 0, 58), P.base, 2);
+  box(x0 - 0.1, 0, x1 - x0 + 0.2, 0.16, 3, 31, B(P.shelf));
+}
+function windowOnLeft(y0, y1, t) {
+  const h = new Date().getHours(), night = h < 6 || h >= 20;
+  const z0 = 34, z1 = 82, pts = [iso(0, y0, z0), iso(0, y1, z0), iso(0, y1, z1), iso(0, y0, z1)];
+  poly(pts, night ? '#1b2a4d' : '#8cc6e6');
+  if (night) stars.forEach(([u, sz, ph]) => { const p = iso(0, y0 + 0.1 + u * (y1 - y0 - 0.2), sz); ctx.fillStyle = `rgba(255,248,220,${0.45 + 0.45 * Math.sin(t * 1.5 + ph)})`; ctx.fillRect(p[0], p[1], 1.6, 1.6); });
+  ctx.strokeStyle = P.base; ctx.lineWidth = 3; ctx.beginPath(); pts.forEach((p, i) => i ? ctx.lineTo(...p) : ctx.moveTo(...p)); ctx.closePath(); ctx.stroke();
+  const mid = (y0 + y1) / 2; line(iso(0, mid, z0), iso(0, mid, z1), P.base, 2); line(iso(0, y0, 58), iso(0, y1, 58), P.base, 2);
+}
+function drawShell(t) {
+  OFF = [0, 0];
+  // slab edge so the floor reads as one building
+  poly([iso(0, BH), iso(BW, BH), iso(BW, BH, -12), iso(0, BH, -12)], '#241a14');
+  poly([iso(BW, 0), iso(BW, BH), iso(BW, BH, -12), iso(BW, 0, -12)], '#1c1410');
+  for (let i = 0; i < BW; i++) for (let j = 0; j < BH; j++)
+    poly([iso(i, j), iso(i + 1, j), iso(i + 1, j + 1), iso(i, j + 1)], (i + j) % 2 ? P.hallA : P.hallB);
+  poly([iso(0, 0), iso(BW, 0), iso(BW, 0, WH), iso(0, 0, WH)], P.wallR);
+  poly([iso(0, 0), iso(0, BH), iso(0, BH, WH), iso(0, 0, WH)], P.wallL);
+  for (let x = 1; x < BW; x++) line(iso(x, 0), iso(x, 0, WH), 'rgba(0,0,0,.13)');
+  for (let y = 1; y < BH; y++) line(iso(0, y), iso(0, y, WH), 'rgba(0,0,0,.13)');
+  poly([iso(0, 0), iso(BW, 0), iso(BW, 0, 6), iso(0, 0, 6)], P.base);
+  poly([iso(0, 0), iso(0, BH), iso(0, BH, 6), iso(0, 0, 6)], P.base);
+  ctx.lineJoin = 'round'; ctx.strokeStyle = P.base; ctx.lineWidth = 4; ctx.beginPath();
+  ctx.moveTo(...iso(0, BH, WH)); ctx.lineTo(...iso(0, 0, WH)); ctx.lineTo(...iso(BW, 0, WH)); ctx.stroke();
+  windowOnBack(8.4, 10.2, t); windowOnBack(21.4, 23.2, t); windowOnBack(11.3, 12.7, t);
+  windowOnLeft(11.8, 13.6, t); windowOnLeft(9.2, 10.8, t);
+  // corridor runner
+  poly([iso(11.2, 0.4), iso(12.8, 0.4), iso(12.8, 19.6), iso(11.2, 19.6)], '#3a332d');
+  poly([iso(0.4, 9.2), iso(23.6, 9.2), iso(23.6, 10.8), iso(0.4, 10.8)], '#3a332d');
+}
+
+/* ---------- drawing: one department room (local coords, OFF = room origin) ---------- */
+function partitions(o, color) {
+  const c = B(color || P.part);
+  if (o.oy > 0) { box(0, -0.14, 4.5, 0.14, PART, 0, c); box(6.5, -0.14, 4.5, 0.14, PART, 0, c); }
+  if (o.ox > 0) { box(-0.14, 0, 0.14, 7.4, PART, 0, c); box(-0.14, 8.8, 0.14, 0.2, PART, 0, c); }
+}
+function drawRoom(d, t) {
+  for (let i = 0; i < COLS; i++) for (let j = 0; j < ROWS; j++)
+    poly([iso(i, j), iso(i + 1, j), iso(i + 1, j + 1), iso(i, j + 1)], (i + j) % 2 ? P.floorA : P.floorB);
+  partitions(d);
+  d.branches.forEach(b => {
+    const { x, y } = areaOf(b), [rA, rB] = b.col;
+    poly([iso(x, y), iso(x + BAW, y), iso(x + BAW, y + BAH), iso(x, y + BAH)], rA);
+    poly([iso(x + 0.12, y + 0.12), iso(x + BAW - 0.12, y + 0.12), iso(x + BAW - 0.12, y + BAH - 0.12), iso(x + 0.12, y + BAH - 0.12)], rB);
+    poly([iso(x + 0.24, y + 0.24), iso(x + BAW - 0.24, y + 0.24), iso(x + BAW - 0.24, y + BAH - 0.24), iso(x + 0.24, y + BAH - 0.24)], rA);
+  });
+  const bc = iso(9.9, 6.9); ell(bc[0], bc[1], 40, 20, P.dirt); ell(bc[0], bc[1] + 1, 26, 12, P.hole);
+  [0, 1, 2, 3].forEach(k => { const b = ST.bed(k), c = iso(b.x, b.y); ell(c[0], c[1] + 2, 30, 15, P.cush); ell(c[0], c[1], 22, 10, P.cushIn); });
+  d.foxes.filter(f => f.state === 'waiting').forEach(f => {
+    const [sx, sy] = iso(f.x, f.y), g = ctx.createLinearGradient(0, sy, 0, sy - 260), a = 0.22 + 0.08 * Math.sin(t * 4);
+    g.addColorStop(0, `rgba(255,200,87,${a})`); g.addColorStop(1, 'rgba(255,200,87,0)');
+    ctx.fillStyle = g; ctx.fillRect(sx - 16, sy - 260, 32, 260);
+    ell(sx, sy, 22, 9, `rgba(255,200,87,${a})`);
+  });
+}
+function drawBoard(d) {
+  box(2.0, 0.15, 1.6, 0.2, 52, 0, B('#5e4330'));
+  poly([iso(2.08, 0.36, 10), iso(3.52, 0.36, 10), iso(3.52, 0.36, 50), iso(2.08, 0.36, 50)], P.cork);
+  d.foxes.filter(f => !f.isCub && f.quest && f.state !== 'sleeping').slice(0, 4).forEach((f, i) => {
+    const x = 2.18 + (i % 2) * 0.68, z = i < 2 ? 46 : 28;
+    poly([iso(x, 0.37, z), iso(x + 0.56, 0.37, z), iso(x + 0.56, 0.37, z - 15), iso(x, 0.37, z - 15)], '#f1e4c6');
+    for (let l = 0; l < 3; l++) line(iso(x + 0.08, 0.375, z - 5 - l * 3.4), iso(x + 0.16 + 0.28 * ((l + i) % 3 / 2 + 0.3), 0.375, z - 5 - l * 3.4), 'rgba(80,60,40,.5)', 1);
+    const pin = iso(x + 0.28, 0.375, z - 1); ell(pin[0], pin[1], 2.2, 2.2, f.fur);
+  });
+}
+function drawDesk(owner, t) {
+  const { x: dx, y: dy } = deskRect(owner), k = owner.bDesk;
+  const on = owner.state === 'working' && owner.act === 'type' && !owner.travel;
+  box(dx, dy, DW, DD, 22, 0, B(P.desk));
+  poly([iso(dx + 0.1, dy + DD + 0.01, 8), iso(dx + 0.45, dy + DD + 0.01, 8), iso(dx + 0.45, dy + DD + 0.01, 15), iso(dx + 0.1, dy + DD + 0.01, 15)], owner.fur);
+  box(dx + 0.42, dy + 0.1, 0.16, 0.12, 4, 22, B(P.mon));
+  box(dx + 0.17, dy + 0.08, 0.66, 0.08, 16, 25, B(P.mon));
+  const fy = dy + 0.165;
+  poly([iso(dx + 0.22, fy, 27), iso(dx + 0.78, fy, 27), iso(dx + 0.78, fy, 39), iso(dx + 0.22, fy, 39)], on ? P.scrOn : P.scrDim);
+  if (on) {
+    for (let i = 0; i < 4; i++) { const zz = 37 - i * 2.6, len = 0.12 + (Math.sin(t * 3 + i * 2 + k) + 1) / 2 * 0.36; line(iso(dx + 0.27, fy + 0.005, zz), iso(dx + 0.27 + Math.min(len, 0.45), fy + 0.005, zz), '#1f5d74', 1.2); }
+    const c = iso(dx + 0.5, dy + 0.4, 32), g = ctx.createRadialGradient(c[0], c[1], 2, c[0], c[1], 46);
+    g.addColorStop(0, 'rgba(155,230,255,.28)'); g.addColorStop(1, 'rgba(155,230,255,0)');
+    ctx.fillStyle = g; ctx.fillRect(c[0] - 46, c[1] - 46, 92, 92);
+  }
+  const mug = iso(dx + 0.88, dy + 0.45, 22); ctx.fillStyle = owner.fur; ctx.fillRect(mug[0] - 2.5, mug[1] - 6, 5, 6);
+}
+function drawShelf() {
+  box(0, 3, 0.55, 2, 72, 0, B(P.shelf));
+  poly([iso(0.55, 3.06, 3), iso(0.55, 4.94, 3), iso(0.55, 4.94, 70), iso(0.55, 3.06, 70)], '#45301f');
+  books.forEach(b => poly([iso(0.56, b.y, b.z), iso(0.56, b.y + b.w, b.z), iso(0.56, b.y + b.w, b.z + b.h), iso(0.56, b.y, b.z + b.h)], b.c));
+  [4, 21, 38, 55].forEach(z => line(iso(0.56, 3.06, z), iso(0.56, 4.94, z), tone(P.shelf, 1.1), 2));
+}
+function drawRack(d, t) {
+  box(0, 5.9, 0.7, 1.1, 80, 0, B(P.rack));
+  const busy = d.foxes.some(f => f.state === 'working' && f.act === 'bash');
+  for (let u = 0; u < 6; u++) {
+    const z = 8 + u * 12;
+    poly([iso(0.71, 5.97, z), iso(0.71, 6.93, z), iso(0.71, 6.93, z + 9), iso(0.71, 5.97, z + 9)], '#363f46');
+    for (let j = 0; j < 4; j++) {
+      const lit = Math.sin(t * (busy ? 16 : 2.5) + u * 1.7 + j * 2.3 + d.idx) > 0.1, y = 6.05 + j * 0.12;
+      poly([iso(0.72, y, z + 3), iso(0.72, y + 0.06, z + 3), iso(0.72, y + 0.06, z + 6), iso(0.72, y, z + 6)], lit ? (j === 3 ? '#ffb347' : '#6ff0a0') : '#22302a');
+    }
+  }
+}
+function drawTelescope() {
+  const top = iso(9.4, 1.05, 28);
+  [iso(9.1, 0.8), iso(9.75, 0.95), iso(9.4, 1.35)].forEach(l => line(top, l, '#5b4330', 2.2));
+  ctx.lineCap = 'round'; line(iso(9.2, 1.15, 25), iso(9.65, 0.6, 46), P.brass, 6); line(iso(9.6, 0.66, 44), iso(9.68, 0.56, 47), '#7a5a2a', 7); ctx.lineCap = 'butt';
+}
+function drawPlant(x = 10.3, y = 0.25) {
+  box(x, y, 0.5, 0.5, 14, 0, B(P.pot));
+  const c = iso(x + 0.25, y + 0.25, 14);
+  [[-8, -8, 9], [7, -10, 8], [0, -18, 10], [-4, -26, 7], [6, -24, 6]].forEach(([dx, dy, r], i) => ell(c[0] + dx, c[1] + dy, r, r * 0.8, i % 2 ? P.leaf : tone(P.leaf, 0.8)));
+}
+
+/* ---------- the Commons: trophy cabinet, a status board for every department, couches ---------- */
+function drawLobby(t) {
+  OFF = [LOBBY.ox, LOBBY.oy];
+  for (let i = 0; i < COLS; i++) for (let j = 0; j < ROWS; j++)
+    poly([iso(i, j), iso(i + 1, j), iso(i + 1, j + 1), iso(i, j + 1)], (i + j) % 2 ? P.lobby : P.lobbyB);
+  partitions(LOBBY);
+  poly([iso(3.5, 3.6), iso(8.5, 3.6), iso(8.5, 7.2), iso(3.5, 7.2)], '#2f4f55');
+  poly([iso(3.7, 3.8), iso(8.3, 3.8), iso(8.3, 7.0), iso(3.7, 7.0)], '#3c6168');
+  const items = [];
+  items.push({ d: 1.2, fn: () => {
+    box(0.4, 0.3, 2.8, 0.6, 58, 0, B('#5e4330'));
+    poly([iso(0.5, 0.91, 6), iso(3.1, 0.91, 6), iso(3.1, 0.91, 54), iso(0.5, 0.91, 54)], 'rgba(160,210,220,.18)');
+    for (let i = 0; i < trophies; i++) {
+      const p = iso(0.8 + (i % 3) * 0.85, 0.9, i < 3 ? 40 : 18);
+      ctx.fillStyle = P.gold; ctx.fillRect(p[0] - 4, p[1] - 2, 8, 2); ctx.fillRect(p[0] - 1, p[1] - 6, 2, 4);
+      ctx.beginPath(); ctx.moveTo(p[0] - 5, p[1] - 12); ctx.lineTo(p[0] + 5, p[1] - 12); ctx.quadraticCurveTo(p[0] + 4, p[1] - 5, p[0], p[1] - 6); ctx.quadraticCurveTo(p[0] - 4, p[1] - 5, p[0] - 5, p[1] - 12); ctx.fill();
+    }
+  } });
+  items.push({ d: 6.5, fn: () => {
+    // status board: one row per department, a light per fox
+    box(5.6, 0.2, 3.6, 0.18, 46, 12, B('#20272b'));
+    box(7.3, 0.25, 0.2, 0.1, 12, 0, B('#20272b'));
+    const fy = 0.385;
+    poly([iso(5.7, fy, 16), iso(9.1, fy, 16), iso(9.1, fy, 54), iso(5.7, fy, 54)], '#0f1c22');
+    DENS.forEach((d, r) => {
+      const z = 49 - r * 12, need = d.foxes.some(f => f.state === 'waiting');
+      poly([iso(5.8, fy + 0.002, z), iso(6.0, fy + 0.002, z), iso(6.0, fy + 0.002, z - 8), iso(5.8, fy + 0.002, z - 8)], d.rug[1]);
+      d.foxes.filter(f => !f.isCub).forEach((f, i) => {
+        const x = 6.15 + i * 0.3, c = f.state === 'waiting' ? (Math.sin(t * 6) > 0 ? COL.alert : '#7a5a1a') : f.state === 'sleeping' ? '#3b4a44' : COL.ok;
+        poly([iso(x, fy + 0.002, z - 1), iso(x + 0.2, fy + 0.002, z - 1), iso(x + 0.2, fy + 0.002, z - 7), iso(x, fy + 0.002, z - 7)], c);
+      });
+      if (need) line(iso(5.75, fy + 0.003, z + 1), iso(9.05, fy + 0.003, z + 1), COL.alert, 1);
+    });
+  } });
+  items.push({ d: 9.2, fn: () => { box(4.2, 4.0, 2.6, 0.9, 10, 0, B(P.couch)); box(4.2, 4.0, 2.6, 0.25, 22, 0, B(P.couch)); } });
+  items.push({ d: 12.0, fn: () => { box(5.0, 5.6, 1.6, 0.8, 9, 0, B('#7b5337')); const c = iso(5.6, 6.0, 9); ctx.fillStyle = '#e8e0d0'; ctx.fillRect(c[0] - 3, c[1] - 5, 6, 5); } });
+  items.push({ d: 10.6, fn: () => { box(7.6, 4.3, 0.9, 2.2, 10, 0, B(P.couch)); box(8.25, 4.3, 0.25, 2.2, 22, 0, B(P.couch)); } });
+  items.push({ d: 1.0, fn: () => drawPlant(0.2, 8.2) }, { d: 10.6, fn: () => drawPlant(10.2, 0.3) }, { d: 18.4, fn: () => drawPlant(10.2, 8.2) });
+  items.push({ d: 3.0, fn: () => { box(0.3, 4.2, 0.8, 2.0, 30, 0, B('#5e4330')); const c = iso(0.9, 5.0, 30); ctx.fillStyle = '#2b2b2b'; ctx.fillRect(c[0] - 6, c[1] - 12, 12, 12); ctx.fillStyle = '#e8e0d0'; ctx.fillRect(c[0] + 8, c[1] - 6, 4, 5); } });
+  items.sort((a, b) => a.d - b.d).forEach(i => i.fn());
 }
 
 function drawFox(f, t) {
@@ -737,19 +791,14 @@ function statusOf(f) {
   return ['idle', 'idle'];
 }
 const PILL = { busy: COL.ok, wait: COL.alert, done: COL.fox, err: COL.err, sleep: COL.muted, idle: COL.muted };
-
 const placed = [];
-function drawLabel(f, t) {
-  const [sx, sy] = iso(f.x, f.y), s = f.scale;
-  const [txt, kind] = statusOf(f);
-  const lift = f.state === 'celebrating' && !reduceMotion ? Math.abs(Math.sin((t + f.phase) * 7)) * 16 : 0;
+function drawLabel(f) {
+  const [sx, sy] = iso(f.x, f.y), [txt, kind] = statusOf(f);
   let y = (f.headTop ?? sy - 40) - 4;
   ctx.font = `600 ${f.isCub ? 10 : 12}px ${FONT}`;
-  const name = f.isCub ? 'cub' : f.name;
-  const nw = ctx.measureText(name).width;
+  const name = f.isCub ? 'cub' : f.name, nw = ctx.measureText(name).width;
   ctx.font = `400 ${f.isCub ? 9 : 10}px ${MONO}`;
-  const label = txt.length > 24 ? txt.slice(0, 23) + '…' : txt;
-  const tw = ctx.measureText(label).width;
+  const label = txt.length > 24 ? txt.slice(0, 23) + '…' : txt, tw = ctx.measureText(label).width;
   const w = nw + tw + 30, h = f.isCub ? 18 : 22, x = sx - w / 2;
   for (let moved = true; moved;) { moved = false; for (const q of placed) if (x < q.x + q.w && q.x < x + w && y - h < q.y + 2 && q.y - q.h < y + 2) { y = q.y - q.h - 3; moved = true; } }
   placed.push({ x, y, w, h });
@@ -758,12 +807,11 @@ function drawLabel(f, t) {
   ell(x + 10, y - h / 2, 3.5, 3.5, PILL[kind]);
   ctx.fillStyle = COL.fg; ctx.textBaseline = 'middle';
   ctx.font = `600 ${f.isCub ? 10 : 12}px ${FONT}`; ctx.fillText(name, x + 18, y - h / 2 + 0.5);
-  ctx.fillStyle = PILL[kind] === COL.muted ? COL.muted : PILL[kind];
+  ctx.fillStyle = PILL[kind];
   ctx.font = `400 ${f.isCub ? 9 : 10}px ${MONO}`; ctx.fillText(label, x + 24 + nw, y - h / 2 + 0.5);
 }
-
-function drawParts() {
-  for (const p of parts) {
+function drawParts(d) {
+  for (const p of d.parts) {
     const a = Math.max(0, p.life / p.max);
     if (p.kind === 'confetti') { ctx.save(); ctx.translate(p.x, p.y); ctx.rotate(p.rot); ctx.globalAlpha = a; ctx.fillStyle = p.color; ctx.fillRect(-2.5, -1.5, 5, 3); ctx.restore(); }
     else if (p.kind === 'smoke') { ctx.globalAlpha = a * 0.6; ell(p.x, p.y, p.r * (2 - a), p.r * (2 - a), '#bfb8ad'); }
@@ -773,111 +821,256 @@ function drawParts() {
   }
 }
 
-function draw(t) {
+/* ---------- camera: one continuous floor you can pan and zoom ---------- */
+const cv = document.getElementById('floor');
+ctx = cv.getContext('2d');
+const BOUNDS = { x0: -BH * TW / 2 - 30, x1: BW * TW / 2 + 30, y0: -WH - 70, y1: (BW + BH) * TH / 2 + 30 };
+const cam = { x: 0, y: 0, z: 0.5 }, camT = { x: 0, y: 0, z: 0.5 };
+let scr = { w: 1, h: 1, dpr: 1 }, fitZ = 0.5, roomZ = 1;
+function roomCenter(o) { return isoAbs(o.ox + 5.5, o.oy + 4.5, 30); }
+function resize() {
+  const r = cv.getBoundingClientRect(), dpr = Math.min(2, devicePixelRatio || 1);
+  if (!r.width) return;
+  scr = { w: r.width, h: r.height, dpr };
+  cv.width = Math.round(r.width * dpr); cv.height = Math.round(r.height * dpr);
+  fitZ = Math.min(r.width / (BOUNDS.x1 - BOUNDS.x0), (r.height - 70) / (BOUNDS.y1 - BOUNDS.y0));
+  roomZ = Math.min(r.width / 760, (r.height - 70) / 520);
+}
+new ResizeObserver(() => { const first = scr.w === 1; resize(); if (first) { overview(true); } }).observe(cv);
+const clampZ = z => Math.max(fitZ * 0.75, Math.min(roomZ * 2.4, z));
+function flyTo(x, y, z, instant) {
+  camT.x = x; camT.y = y; camT.z = clampZ(z);
+  if (instant || reduceMotion) Object.assign(cam, camT);
+}
+function overview(instant) { flyTo((BOUNDS.x0 + BOUNDS.x1) / 2, (BOUNDS.y0 + BOUNDS.y1) / 2 + 10, fitZ, instant); }
+function visit(o, instant) { const [x, y] = roomCenter(o); flyTo(x, y, roomZ, instant); }
+function visitBranch(d, b) { const a = areaOf(b); flyTo(...isoAbs(d.ox + a.x + BAW / 2, d.oy + a.y + BAH / 2, 20), roomZ * 1.7); }
+function updateView() {
+  const k = reduceMotion ? 1 : 0.14;
+  cam.x += (camT.x - cam.x) * k; cam.y += (camT.y - cam.y) * k; cam.z += (camT.z - cam.z) * k;
+  view = { s: cam.z, ox: scr.w / 2 - cam.x * cam.z, oy: scr.h / 2 + 20 - cam.y * cam.z, dpr: scr.dpr };
+}
+const toWorld = (px, py) => [(px - view.ox) / view.s, (py - view.oy) / view.s];
+const toScreen = (wx, wy) => [view.ox + wx * view.s, view.oy + wy * view.s];
+function focusRoom() {
+  // the department the camera is centred on, once zoomed in enough to be "in" it
+  if (cam.z < roomZ * 0.6) return null;
+  let best = null, bd = Infinity;
+  [...DENS, LOBBY].forEach(o => { const [x, y] = roomCenter(o), dd = Math.hypot(x - cam.x, y - cam.y); if (dd < bd) { bd = dd; best = o; } });
+  return bd < 360 ? best : null;
+}
+
+let signs = [];
+function drawSigns() {
+  // department signs float above each room; branch tags sit at the front of their rugs and step aside so nothing overlaps
+  signs = [];
+  ctx.setTransform(scr.dpr, 0, 0, scr.dpr, 0, 0);
+  ctx.textBaseline = 'middle';
+  const depts = [...DENS, LOBBY].map(o => {
+    const isDen = !!o.foxes;
+    const [x, y] = toScreen(...isoAbs(o.ox + 5.5, o.oy + 0.2, isDen ? 128 : 90));
+    const need = isDen ? o.foxes.filter(f => f.state === 'waiting').length : 0;
+    const awake = isDen ? o.foxes.filter(f => !f.isCub && f.state !== 'sleeping').length : 0;
+    const state = !isDen ? 'shared space' : need ? `${need} needs you` : awake ? `${awake} awake` : 'all asleep';
+    ctx.font = `600 13px ${MONO}`; const nw = ctx.measureText(o.name).width;
+    ctx.font = `600 11px ${FONT}`; const sw = ctx.measureText(state).width;
+    const w = nw + sw + 44, h = 28;
+    return { o, isDen, need, awake, state, nw, x: x - w / 2, y: y - h / 2, w, h };
+  });
+  const taken = depts.map(r => ({ ...r }));
+  const hit = (a, b) => a.x < b.x + b.w + 4 && b.x < a.x + a.w + 4 && a.y < b.y + b.h + 3 && b.y < a.y + a.h + 3;
+  DENS.forEach(d => d.branches.forEach(b => {
+    const a = areaOf(b), [x, y] = toScreen(...isoAbs(d.ox + a.x + BAW / 2, d.oy + a.y + BAH + 0.1, 0));
+    const wait = b.foxes.some(f => f.state === 'waiting'), text = '⎇ ' + b.name;
+    ctx.font = `600 10.5px ${MONO}`;
+    const r = { w: ctx.measureText(text).width + 16, h: 19 }; r.x = x - r.w / 2; r.y = y - r.h / 2 + 4;
+    for (let n = 0; n < 8 && taken.some(q => hit(r, q)); n++) r.y += r.h + 4;
+    taken.push(r);
+    ctx.fillStyle = wait ? 'rgba(48,38,12,.94)' : 'rgba(14,21,19,.86)'; rrect(r.x, r.y, r.w, r.h, 6); ctx.fill();
+    ctx.strokeStyle = wait ? COL.alert : b.col[1]; ctx.lineWidth = 1; ctx.stroke();
+    ctx.fillStyle = wait ? COL.alert : COL.fg; ctx.fillText(text, r.x + 8, r.y + r.h / 2 + 0.5);
+    signs.push({ d, b, ...r });
+  }));
+  depts.forEach(({ o, isDen, need, awake, state, nw, x: bx, y: by, w, h }) => {
+    ctx.fillStyle = need ? 'rgba(48,38,12,.94)' : 'rgba(14,21,19,.9)'; rrect(bx, by, w, h, 8); ctx.fill();
+    ctx.strokeStyle = need ? COL.alert : 'rgba(255,255,255,.12)'; ctx.lineWidth = 1; ctx.stroke();
+    ctx.fillStyle = isDen ? o.rug[1] : '#3c6168'; rrect(bx + 10, by + 9, 10, 10, 3); ctx.fill();
+    ctx.fillStyle = COL.fg; ctx.font = `600 13px ${MONO}`; ctx.fillText(o.name, bx + 28, by + h / 2 + 0.5);
+    ctx.fillStyle = need ? COL.alert : awake ? COL.ok : COL.muted; ctx.font = `600 11px ${FONT}`; ctx.fillText(state, bx + 36 + nw, by + h / 2 + 0.5);
+    signs.push({ o, x: bx, y: by, w, h });
+  });
+}
+function render(t) {
+  updateView();
   ctx.setTransform(1, 0, 0, 1, 0, 0);
   ctx.clearRect(0, 0, cv.width, cv.height);
-  ctx.setTransform(view.dpr * view.s, 0, 0, view.dpr * view.s, view.dpr * view.ox, view.dpr * view.oy);
+  ctx.setTransform(scr.dpr * view.s, 0, 0, scr.dpr * view.s, scr.dpr * view.ox, scr.dpr * view.oy);
   ctx.lineCap = 'butt';
-  drawRoom(t);
-  const items = [];
-  for (let k = 0; k < 4; k++) items.push({ d: 1.0 + 1.8 * k + 0.7 + 0.5, fn: () => drawDesk(k, t) });
-  items.push({ d: 4.3, fn: drawShelf }, { d: 6.6, fn: () => drawRack(t) }, { d: 10.0, fn: drawTelescope }, { d: 11.0, fn: drawPlant });
-  foxes.forEach(f => items.push({ d: f.x + f.y, fn: () => drawFox(f, t) }));
-  items.sort((a, b) => a.d - b.d).forEach(i => i.fn());
-  ctx.lineCap = 'butt';
-  // warm lamp glow
+  drawShell(t);
+  // rooms back to front: billing (left), acme/web (top), foxhole (right), then the Commons (front)
+  const rooms = [...DENS.map(d => ({ o: d, k: d.ox + d.oy, fn: () => drawDen(d, t) })), { o: LOBBY, k: LOBBY.ox + LOBBY.oy, fn: () => drawLobby(t) }];
+  rooms.sort((a, b) => a.k - b.k).forEach(r => r.fn());
+  OFF = [0, 0];
   ctx.globalCompositeOperation = 'lighter';
-  const c = iso(4.5, 2.5, 40), g = ctx.createRadialGradient(c[0], c[1], 10, c[0], c[1], 330);
-  g.addColorStop(0, 'rgba(255,170,80,.10)'); g.addColorStop(1, 'rgba(255,170,80,0)');
-  ctx.fillStyle = g; ctx.fillRect(c[0] - 330, c[1] - 330, 660, 660);
+  const c = isoAbs(12, 10, 40), g = ctx.createRadialGradient(c[0], c[1], 10, c[0], c[1], 700);
+  g.addColorStop(0, 'rgba(255,170,80,.08)'); g.addColorStop(1, 'rgba(255,170,80,0)');
+  ctx.fillStyle = g; ctx.fillRect(c[0] - 700, c[1] - 700, 1400, 1400);
   ctx.globalCompositeOperation = 'source-over';
-  placed.length = 0;
-  [...foxes].sort((a, b) => (b.x + b.y) - (a.x + a.y)).forEach(f => drawLabel(f, t));
-  drawParts();
+  if (view.s > roomZ * 0.55) {
+    placed.length = 0;
+    DENS.forEach(d => { OFF = [d.ox, d.oy]; [...d.foxes].sort((a, b) => (b.x + b.y) - (a.x + a.y)).forEach(drawLabel); });
+  }
+  OFF = [0, 0];
+  DENS.forEach(drawParts);
+  drawSigns();
 }
+function drawDen(d, t) {
+  OFF = [d.ox, d.oy];
+  drawRoom(d, t);
+  const items = [];
+  d.foxes.filter(f => !f.isCub).forEach(f => { const r = deskRect(f); items.push({ d: r.x + DW / 2 + r.y + DD / 2, fn: () => drawDesk(f, t) }); });
+  items.push({ d: 2.5, fn: () => drawBoard(d) }, { d: 4.3, fn: drawShelf }, { d: 6.6, fn: () => drawRack(d, t) }, { d: 10.0, fn: drawTelescope }, { d: 11.0, fn: () => drawPlant() });
+  d.foxes.forEach(f => items.push({ d: f.x + f.y, fn: () => drawFox(f, t) }));
+  items.sort((a, b) => a.d - b.d).forEach(i => i.fn());
+}
+
+// pointer: drag to pan, pinch or wheel to zoom, tap to pick a fox or a department
+const pts = new Map(); let drag = null;
+cv.addEventListener('pointerdown', e => { cv.setPointerCapture(e.pointerId); pts.set(e.pointerId, [e.offsetX, e.offsetY]); drag = { moved: 0, pinch: pts.size === 2 ? pinchState() : null }; });
+function pinchState() { const [a, b] = [...pts.values()]; return { d: Math.hypot(a[0] - b[0], a[1] - b[1]), z: camT.z, mid: [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2] }; }
+cv.addEventListener('pointermove', e => {
+  if (!pts.has(e.pointerId) || !drag) return;
+  const prev = pts.get(e.pointerId), dx = e.offsetX - prev[0], dy = e.offsetY - prev[1];
+  pts.set(e.pointerId, [e.offsetX, e.offsetY]);
+  if (pts.size === 2 && drag.pinch) {
+    const now = pinchState(); zoomAt(drag.pinch.mid[0], drag.pinch.mid[1], drag.pinch.z * now.d / drag.pinch.d, true); drag.moved += 10; return;
+  }
+  drag.moved += Math.abs(dx) + Math.abs(dy);
+  if (drag.moved > 4) { cv.classList.add('dragging'); camT.x -= dx / cam.z; camT.y -= dy / cam.z; cam.x = camT.x; cam.y = camT.y; }
+});
+function endPointer(e) {
+  if (!pts.has(e.pointerId)) return;
+  pts.delete(e.pointerId);
+  if (drag && drag.moved <= 4 && pts.size === 0) tap(e.offsetX, e.offsetY);
+  if (pts.size === 0) { drag = null; cv.classList.remove('dragging'); }
+}
+cv.addEventListener('pointerup', endPointer); cv.addEventListener('pointercancel', endPointer);
+function zoomAt(px, py, z, instant) {
+  const [wx, wy] = toWorld(px, py), nz = clampZ(z);
+  camT.z = nz; camT.x = wx - (px - scr.w / 2) / nz; camT.y = wy - (py - scr.h / 2 - 20) / nz;
+  if (instant) Object.assign(cam, camT);
+}
+cv.addEventListener('wheel', e => { e.preventDefault(); zoomAt(e.offsetX, e.offsetY, camT.z * Math.exp(-e.deltaY * 0.0015), true); }, { passive: false });
+cv.addEventListener('keydown', e => {
+  const step = 80 / cam.z, k = e.key;
+  if (k === 'ArrowLeft') camT.x -= step; else if (k === 'ArrowRight') camT.x += step;
+  else if (k === 'ArrowUp') camT.y -= step; else if (k === 'ArrowDown') camT.y += step;
+  else if (k === '+' || k === '=') camT.z = clampZ(camT.z * 1.25); else if (k === '-') camT.z = clampZ(camT.z / 1.25);
+  else return;
+  e.preventDefault();
+});
+function tap(px, py) {
+  const sign = [...signs].reverse().find(s => px >= s.x && px <= s.x + s.w && py >= s.y && py <= s.y + s.h);
+  if (sign) { if (sign.b) visitBranch(sign.d, sign.b); else visit(sign.o); return; }
+  const [wx, wy] = toWorld(px, py);
+  let best = null, bd = 30;
+  DENS.forEach(d => d.foxes.forEach(f => { const [sx, sy] = wpos(f), dd = Math.hypot(wx - sx, wy - (sy - 16)); if (dd < bd) { bd = dd; best = f; } }));
+  if (best) { select(best.parent || best); if (cam.z < roomZ * 0.6) visit(best.den); return; }
+  if (cam.z < roomZ * 0.6) {
+    // click anywhere on a department's floor to go there
+    const room = [...DENS, LOBBY].find(o => { const lx = (wx / (TW / 2) + wy / (TH / 2)) / 2 - o.ox, ly = (wy / (TH / 2) - wx / (TW / 2)) / 2 - o.oy; return lx >= 0 && lx <= COLS && ly >= 0 && ly <= ROWS; });
+    if (room) visit(room);
+  }
+}
+document.getElementById('zoom-in').addEventListener('click', () => { camT.z = clampZ(camT.z * 1.35); });
+document.getElementById('zoom-out').addEventListener('click', () => { camT.z = clampZ(camT.z / 1.35); });
+document.getElementById('overview').addEventListener('click', () => overview());
 
 /* ---------- UI ---------- */
 const $ = id => document.getElementById(id);
 const hash = s => { let h = 2166136261; for (const ch of s) h = Math.imul(h ^ ch.charCodeAt(0), 16777619); return 'h:' + (h >>> 0).toString(16).slice(0, 6); };
 const fmtTarget = t => t == null ? '' : hideTargets ? hash(t) : t;
 const short = t => { if (t == null) return ''; if (hideTargets) return hash(t); const b = t.includes('/') && !t.includes(' ') ? t.split('/').pop() : t; return b.length > 18 ? b.slice(0, 17) + '…' : b; };
-const hhmmss = iso => iso.slice(11, 19);
+const hhmmss = s => s.slice(11, 19);
 const fmtK = n => n >= 1000 ? (n / 1000).toFixed(1) + 'k' : String(n);
 const cost = f => { const [i, o] = RATES[f.model]; return (f.tIn * i + f.tOut * o) / 1e6; };
 const typeClass = ev => ev.type === 'permission.request' ? 'ty-perm' : ev.type === 'session.stop' ? 'ty-stop' : ev.status === 'error' ? 'ty-err' : ev.type.startsWith('session') ? 'ty-sess' : '';
+const awakeOf = d => d.foxes.filter(f => !f.isCub && f.state !== 'sleeping');
+// the department in view comes first, so Approve answers the fox in front of you
+const waitingAll = () => { const fr = focusRoom(); return DENS.flatMap(d => d.foxes.filter(f => f.state === 'waiting')).sort((a, b) => (b.den === fr) - (a.den === fr)); };
 
 const logEl = $('log');
 function logEvent(f, ev) {
   const li = document.createElement('li');
-  const who = f.isCub ? `↳ ${f.name} cub` : f.name;
-  const what = ev.tool ? `${ev.tool} ${fmtTarget(ev.target)}` : ev.usage && ev.type === 'session.stop' ? `${fmtK(ev.usage.inputTokens + ev.usage.outputTokens)} tokens` : '';
-  li.innerHTML = `<span class="t"></span><span class="who"><i></i><span></span></span><span class="${typeClass(ev)}"></span><span></span>`;
+  li.innerHTML = '<span class="t"></span><span class="repo"></span><span class="who"><i></i><span></span></span><span></span><span></span>';
   li.children[0].textContent = hhmmss(ev.ts);
+  li.children[1].textContent = f.den.name;
   li.querySelector('.who i').style.background = f.fur;
-  li.querySelector('.who span').textContent = who;
-  li.children[2].textContent = ev.type + (ev.status === 'error' ? ' ✕' : '');
-  li.children[3].textContent = what;
-  li.addEventListener('click', () => { select(f.parent || f); showJson(ev); });
+  li.querySelector('.who span').textContent = f.isCub ? `↳ ${f.name} cub` : f.name;
+  li.children[3].className = typeClass(ev);
+  li.children[3].textContent = ev.type + (ev.status === 'error' ? ' ✕' : '');
+  li.children[4].textContent = ev.tool ? `${ev.tool} ${fmtTarget(ev.target)}` : ev.type === 'session.stop' ? `${fmtK(ev.usage.inputTokens + ev.usage.outputTokens)} tokens` : '';
+  li.addEventListener('click', () => { const o = f.parent || f; select(o); visit(o.den); showJson(ev); });
   logEl.prepend(li);
-  while (logEl.children.length > 120) logEl.lastChild.remove();
+  while (logEl.children.length > 160) logEl.lastChild.remove();
   if ((f.parent || f) === selected) showJson(ev);
 }
-function noteLine(text) {
+function noteLine(f, text) {
   const li = document.createElement('li');
-  li.innerHTML = `<span class="t"></span><span class="ui-note" style="grid-column: 2 / -1"></span>`;
+  li.innerHTML = '<span class="t"></span><span class="ui-note"></span>';
   li.children[0].textContent = new Date().toISOString().slice(11, 19);
-  li.children[1].textContent = text + ' (in the den UI, not a plugin event)';
+  li.children[1].textContent = `${f.den.name} · ${text}`;
   logEl.prepend(li);
 }
 let jsonEv = null;
-function showJson(ev) {
-  jsonEv = ev;
-  const view = { ...ev };
-  if (view.target != null) view.target = fmtTarget(view.target);
-  $('d-json').textContent = JSON.stringify(view, null, 2);
-}
-
+function showJson(ev) { jsonEv = ev; const v = { ...ev }; if (v.target != null) v.target = fmtTarget(v.target); $('d-json').textContent = JSON.stringify(v, null, 2); }
 function toast(title, sub) {
   const el = document.createElement('div'); el.className = 'toast';
   el.innerHTML = '<b></b><span></span>'; el.children[0].textContent = title; el.children[1].textContent = sub;
   $('toasts').prepend(el);
+  while ($('toasts').children.length > 3) $('toasts').lastChild.remove();
   setTimeout(() => el.remove(), 5200);
 }
-function unlock(name, sub) { trophies = Math.min(5, trophies); toast('Achievement: ' + name, sub); }
 
-// roster
-const roster = $('roster'), cards = new Map();
-foxes.filter(f => !f.isCub).forEach(f => {
-  const b = document.createElement('button'); b.type = 'button'; b.className = 'fox-card';
-  b.innerHTML = `<span class="dot"></span><span class="fc-name"><span></span><span class="src"></span></span><span class="pill"></span><span class="fc-line"></span>`;
-  b.querySelector('.dot').style.background = f.fur;
-  b.querySelector('.fc-name span').textContent = f.name;
-  b.querySelector('.src').textContent = f.source;
-  b.addEventListener('click', () => select(f));
-  roster.append(b); cards.set(f, b);
-});
+// department list: each one flies the camera there; each branch flies to its corner
+const deptsEl = $('depts'), deptEls = new Map();
+function buildDepts() {
+  deptsEl.innerHTML = ''; deptEls.clear();
+  DENS.forEach(d => {
+    const wrap = document.createElement('div'); wrap.className = 'dept';
+    wrap.innerHTML = '<button type="button" class="dept-top"><span class="dept-name"><span class="swatch"></span><span></span></span><span class="dept-state"></span></button><div class="branches"></div>';
+    wrap.querySelector('.swatch').style.background = d.rug[1];
+    wrap.querySelector('.dept-name span:last-child').textContent = d.name;
+    wrap.querySelector('.dept-top').addEventListener('click', () => visit(d));
+    const bl = wrap.querySelector('.branches');
+    d.branches.forEach(b => {
+      const row = document.createElement('button'); row.type = 'button'; row.className = 'branch';
+      row.innerHTML = '<span class="bname"><i></i><span></span></span><span class="foxchips"></span>';
+      row.querySelector('.bname i').style.background = b.col[1];
+      row.querySelector('.bname span').textContent = '⎇ ' + b.name;
+      row.addEventListener('click', () => { visitBranch(d, b); select(b.foxes[0]); });
+      row.dataset.b = b.name; bl.append(row);
+    });
+    deptsEl.append(wrap); deptEls.set(d, wrap);
+  });
+}
+buildDepts();
+let lastTimelineKey = '';
 function select(f) {
   selected = f;
-  cards.forEach((b, o) => b.setAttribute('aria-pressed', String(o === f)));
-  $('d-dot').style.background = f.fur; $('d-name').textContent = f.name; $('d-src').textContent = `${f.source} · ${f.model}`;
+  $('d-dot').style.background = f.fur; $('d-name').textContent = f.name; $('d-src').textContent = `${f.source} · ${f.model} · ${f.den.name} · ⎇ ${f.branch}`;
   const last = f.events[f.events.length - 1];
   if (last) showJson(last.ev); else $('d-json').textContent = 'No events yet.';
   lastTimelineKey = '';
-  renderUi();
+  renderDetail();
 }
-let lastTimelineKey = '';
-function renderUi() {
-  cards.forEach((b, f) => {
-    const [txt, kind] = statusOf(f);
-    const pill = b.querySelector('.pill'); pill.className = 'pill s-' + kind; pill.textContent = kind === 'busy' ? 'working' : kind === 'wait' ? 'needs you' : kind === 'done' ? 'done' : kind === 'err' ? 'error' : kind === 'sleep' ? 'asleep' : 'idle';
-    const cubs = foxes.filter(c => c.parent === f).length;
-    b.querySelector('.fc-line').textContent = `${txt} · ${fmtK(f.tIn + f.tOut)} tok · $${cost(f).toFixed(3)}${cubs ? ` · ${cubs} cub${cubs > 1 ? 's' : ''} out` : ''}`;
-  });
-  const f = selected;
+function renderDetail() {
+  const f = selected; if (!f) return;
   $('d-quest').innerHTML = '';
   if (f.quest) {
     const el = document.createElement('div'); el.textContent = f.quest.title;
-    const sm = document.createElement('small'); sm.textContent = `${f.quest.repo} · ${f.state === 'sleeping' ? 'last quest' : `${Math.floor((simT - f.qStart) / 60)}m ${String(Math.floor((simT - f.qStart) % 60)).padStart(2, '0')}s on quest`}`;
+    const sm = document.createElement('small'); const e2 = simT - f.qStart;
+    sm.textContent = `⎇ ${f.branch} · ${f.state === 'sleeping' ? 'last quest' : `${Math.floor(e2 / 60)}m ${String(Math.floor(e2 % 60)).padStart(2, '0')}s on quest`}`;
     $('d-quest').append(el, sm);
   } else $('d-quest').textContent = f.state === 'sleeping' ? 'Asleep. Wakes on the next session.start.' : 'Waking up…';
   $('d-in').textContent = fmtK(f.tIn); $('d-out').textContent = fmtK(f.tOut);
@@ -886,62 +1079,75 @@ function renderUi() {
   if (key !== lastTimelineKey) {
     lastTimelineKey = key;
     const ol = $('d-time'); ol.innerHTML = '';
-    f.events.slice(-7).reverse().forEach(({ ev, cub }) => {
-      const li = document.createElement('li');
-      li.innerHTML = '<span></span><span></span>';
+    f.events.slice(-6).reverse().forEach(({ ev, cub }) => {
+      const li = document.createElement('li'); li.innerHTML = '<span></span><span></span>';
       li.children[0].textContent = hhmmss(ev.ts);
       li.children[1].textContent = `${cub ? '↳ cub ' : ''}${ev.type}${ev.tool ? ' · ' + ev.tool + ' ' + short(ev.target) : ''}${ev.status === 'error' ? ' ✕' : ''}`;
       ol.append(li);
     });
     if (!f.events.length) ol.innerHTML = '<li><span></span><span>Nothing yet</span></li>';
   }
-  const awake = foxes.filter(o => !o.isCub && o.state !== 'sleeping').length, asleep = foxes.filter(o => !o.isCub && o.state === 'sleeping').length;
-  const need = foxes.filter(o => o.state === 'waiting').length, cubs = foxes.filter(o => o.isCub).length;
-  $('hud-den').innerHTML = `<strong>${awake} awake</strong><span class="muted">${asleep} asleep${cubs ? ` · ${cubs} cub${cubs > 1 ? 's' : ''} out` : ''}</span>${need ? `<strong style="color:var(--alert)">${need} need${need > 1 ? '' : 's'} you</strong>` : ''}`;
+}
+function renderDepts() {
+  const fr = focusRoom();
+  deptEls.forEach((el, d) => {
+    const wait = d.foxes.filter(f => f.state === 'waiting').length, awake = awakeOf(d).length, all = d.foxes.filter(f => !f.isCub);
+    el.classList.toggle('need', wait > 0);
+    el.setAttribute('aria-current', String(fr === d));
+    el.querySelector('.dept-state').textContent = wait ? `${wait} needs you` : awake ? `${awake} of ${all.length} awake` : 'all asleep';
+    d.branches.forEach(b => {
+      const row = el.querySelector(`.branch[data-b="${CSS.escape(b.name)}"]`); if (!row) return;
+      const chips = row.querySelector('.foxchips'), key = b.foxes.map(f => f.name + statusOf(f)[1]).join();
+      row.classList.toggle('need', b.foxes.some(f => f.state === 'waiting'));
+      if (chips.dataset.k !== key) {
+        chips.dataset.k = key; chips.innerHTML = '';
+        b.foxes.forEach(f => { const s = document.createElement('span'), i = document.createElement('i'); i.style.background = PILL[statusOf(f)[1]]; s.append(i, f.name); chips.append(s); });
+      }
+    });
+  });
+  const where = $('where');
+  if (fr) {
+    const isDen = !!fr.foxes;
+    where.textContent = isDen ? `You're in ${fr.name} · ${fr.branches.length} branch${fr.branches.length > 1 ? 'es' : ''} · ${awakeOf(fr).length} awake` : 'You’re in the Commons · status board and trophies';
+  } else where.textContent = `Whole floor · ${DENS.length} departments · ${DENS.reduce((a, d) => a + awakeOf(d).length, 0)} foxes awake`;
+}
+function renderAlert() {
+  const waiting = waitingAll(), el = $('alert');
+  if (!waiting.length) { el.className = 'alert off'; $('alert-icon').textContent = '✓'; $('alert-title').textContent = 'No fox needs you right now.'; $('alert-sub').textContent = ''; return; }
+  const f = waiting[0], s = f.cur, left = Math.max(0, Math.ceil(25 - (simT - f.waitSince)));
+  el.className = 'alert on'; $('alert-icon').textContent = '!';
+  $('alert-title').textContent = `${f.name} in ${f.den.name} · ${f.branch} needs you` + (waiting.length > 1 ? ` (+${waiting.length - 1} more)` : '');
+  $('alert-sub').textContent = `${s.tool} wants to run: ${fmtTarget(s.target)} · demo auto-approves in ${left}s`;
+  $('go-den').hidden = focusRoom() === f.den;
+}
+function renderUi() {
   $('lvl').textContent = 'Lv ' + level;
   $('xpbar').style.width = (xp / xpNeed(level) * 100).toFixed(1) + '%';
   $('xptext').textContent = `${xp} / ${xpNeed(level)} XP`;
-  renderAlert();
+  renderAlert(); renderDepts(); renderDetail();
 }
-function renderAlert() {
-  const waiting = foxes.filter(o => o.state === 'waiting');
-  const el = $('alert');
-  if (!waiting.length) { el.hidden = true; return; }
-  const f = waiting[0], s = f.cur, left = Math.max(0, Math.ceil(25 - (simT - f.waitSince)));
-  el.hidden = false;
-  $('alert-title').textContent = `${f.name} needs you` + (waiting.length > 1 ? ` (+${waiting.length - 1} more)` : '');
-  $('alert-sub').textContent = `${s.tool} wants to run: ${fmtTarget(s.target)} · demo auto-approves in ${left}s`;
-  el.dataset.fox = f.id;
-}
-$('approve').addEventListener('click', () => { const f = foxes.find(o => o.state === 'waiting'); if (f) decide(f, true); });
-$('deny').addEventListener('click', () => { const f = foxes.find(o => o.state === 'waiting'); if (f) decide(f, false); });
-
-let paused = false;
+$('approve').addEventListener('click', () => { const f = waitingAll()[0]; if (f) decide(f, true); });
+$('deny').addEventListener('click', () => { const f = waitingAll()[0]; if (f) decide(f, false); });
+$('go-den').addEventListener('click', () => { const f = waitingAll()[0]; if (f) { select(f); visit(f.den); } });
 [['sp0', 0], ['sp1', 1], ['sp2', 2], ['sp4', 4]].forEach(([id, v]) => $(id).addEventListener('click', () => {
   paused = v === 0; if (v) speed = v;
   ['sp0', 'sp1', 'sp2', 'sp4'].forEach(o => $(o).setAttribute('aria-pressed', String(o === id)));
 }));
 $('hide-targets').addEventListener('change', e => { hideTargets = e.target.checked; if (jsonEv) showJson(jsonEv); lastTimelineKey = ''; renderUi(); });
 
-cv.addEventListener('click', e => {
-  const r = cv.getBoundingClientRect();
-  const wx = (e.clientX - r.left - view.ox) / view.s, wy = (e.clientY - r.top - view.oy) / view.s;
-  let best = null, bd = 34;
-  foxes.forEach(f => { const [sx, sy] = iso(f.x, f.y), d = Math.hypot(wx - sx, wy - (sy - 14)); if (d < bd) { bd = d; best = f; } });
-  if (best) select(best.parent || best);
-});
-
 /* ---------- loop ---------- */
-resize();
-select(ember);
+resize(); overview(true);
+select(DENS[0].foxes[0]);
 let last = performance.now(), uiAcc = 0;
 function frame(now) {
   const raw = Math.min(0.05, (now - last) / 1000); last = now;
   const dt = paused ? 0 : raw * speed;
-  simT += dt; tick(dt); draw(simT);
+  simT += dt; tick(dt);
+  if (scr.w > 1) render(simT);
   uiAcc += raw; if (uiAcc > 0.25) { uiAcc = 0; renderUi(); }
   requestAnimationFrame(frame);
 }
+renderUi();
 requestAnimationFrame(frame);
 })();
 </script>

@@ -2,7 +2,7 @@
 
 > See your agents work, know when they need you, and watch them level up.
 
-Foxhole HQ is a plugin + website that turns AI coding agents (Claude Code, Codex, and others) into animated foxes living in 3D isometric dens, one den per repo. Each fox shows what its agent is doing in real time, raises a paw when it needs you, earns XP for verified work, and competes on a global leaderboard that rewards **impact per token** — efficient agents rank highest.
+Foxhole HQ is a plugin + website that turns AI coding agents (Claude Code, Codex, and others) into animated foxes living in 3D isometric dens on one shared HQ floor: one den per repo, one corner per branch. Each fox shows what its agent is doing in real time, raises a paw when it needs you, earns XP for verified work, and competes on a global leaderboard that rewards **impact per token** — efficient agents rank highest.
 
 ---
 
@@ -71,7 +71,7 @@ Foxhole HQ is a plugin + website that turns AI coding agents (Claude Code, Codex
 
 **Key principle:** the **den** is the persistent object. Each repo gets its own den, owned by the user's account (or team). Sessions come and go inside it. The website connects to dens, never to a single session — so they stay live after any agent session ends.
 
-An account's dens together form its **warren**: one overview that shows every den at work at a glance. The warren is a thin aggregate that subscribes to a small summary feed from each den (awake/asleep counts, who needs you, current quest), not to every event.
+An account's dens sit side by side on one **HQ floor**: a single explorable 3D space where every den is a department, so you can see every repo at work at a glance and move between them without switching views. Inside a den, each **branch** gets its own corner. The HQ floor is a thin aggregate that subscribes to a small summary feed from each den (awake/asleep counts, who needs you, current quest per branch), not to every event.
 
 ---
 
@@ -85,7 +85,7 @@ An account's dens together form its **warren**: one overview that shows every de
 
 ### Backend
 - **Cloudflare Workers** — API + auth endpoints.
-- **Durable Objects** (SQLite-backed) — one den per repo per user/team; holds live state, fans out WebSocket updates. One lightweight warren object per account aggregates den summaries for the overview.
+- **Durable Objects** (SQLite-backed) — one den per repo per user/team; holds live state, fans out WebSocket updates. One lightweight HQ object per account aggregates den summaries for the floor overview.
 - **D1 or Supabase Postgres** — accounts, verified tasks, leaderboard.
 - **GitHub App** — verifies PRs, merges, CI status, reverts.
 - **Auth** — GitHub OAuth.
@@ -128,11 +128,12 @@ All adapters normalize into one schema:
   "target": "src/auth/session.ts",  // file name or short label only (configurable / hashable)
   "status": "ok",                   // ok | error | waiting
   "usage": { "inputTokens": 1200, "outputTokens": 340, "model": "…" },
-  "repo": "github.com/owner/name"   // picks the den; also used for verification
+  "repo": "github.com/owner/name",  // picks the den; also used for verification
+  "branch": "feat/csp-headers"      // picks the branch corner inside the den
 }
 ```
 
-**Den routing:** the local agent fills `repo` from the session's working directory (its git remote). Every session for the same repo, from any machine or agent tool, lands in that repo's den. A repo with no remote gets a den named after its folder (hashed if targets are hidden), and sessions outside any repo go to a shared **scratch den**.
+**Den routing:** the local agent fills `repo` from the session's working directory (its git remote). Every session for the same repo, from any machine or agent tool, lands in that repo's den. The local agent also reads the current git branch, which picks the branch corner inside the den; a subagent inherits its parent's branch. A repo with no remote gets a den named after its folder (hashed if targets are hidden), and sessions outside any repo go to a shared **scratch den**.
 
 | Event type | Fox behavior |
 |---|---|
@@ -165,14 +166,14 @@ All adapters normalize into one schema:
 
 ### Links
 - **Pairing link** — one-time, connects a machine, then expires.
-- **Warren link** — permanent, bookmarkable overview of all your dens (`foxhole-hq.com/<handle>`).
+- **HQ link** — permanent, bookmarkable view of your whole floor (`foxhole-hq.com/<handle>`).
 - **Den link** — permanent, bookmarkable, one per repo (`foxhole-hq.com/<handle>/<repo>`).
-- **Share link** — read-only, revocable; for one den or the whole warren, e.g. a team TV or a phone without login.
+- **Share link** — read-only, revocable; for one den or the whole HQ floor, e.g. a team TV or a phone without login.
 
 ### Persistence
 - Each den's state lives in its own Durable Object; history in SQLite/DB.
 - When sessions end, foxes go to bed; the page stays connected and shows a quiet "night" state + daily recap.
-- New sessions wake foxes without a page refresh. A session in a repo you haven't used before creates its den automatically, and it appears in the warren.
+- New sessions wake foxes without a page refresh. A session in a repo you haven't used before creates its den automatically, and it appears on the HQ floor. A session on a new branch gets a new branch corner in that den.
 - Claude Code and Codex agents working on the same repo share that repo's den (Codex agents could be a different animal).
 
 ---
@@ -184,15 +185,18 @@ All adapters normalize into one schema:
 - Soft directional light + shadows, warm lamps.
 - Low-poly / voxel aesthetic, cozy den interior.
 
-### Dens and the warren
-- **One den per repo.** Each den is its own room, titled with the repo name (or its alias), with its own foxes, quest board, and history.
-- **Warren view.** All your dens shown together at a glance, as a grid of small live rooms (or a map of connected burrows). Each tile shows its foxes moving, a count of who's awake, and a gold glow plus "!" on any den where a fox needs you. Click a tile to zoom into that den.
-- Dens sort with "needs you" first, then busiest, then most recent; quiet dens dim to their night state.
-- Alerts and approvals in the warren carry the repo name, so you know which project is asking before you open it.
+### The HQ floor, dens, and branch corners
+- **One HQ floor.** All your dens sit on one continuous isometric floor, like departments in an office, linked by corridors and a shared **Commons** (trophy cabinet, a status board with a light per fox, couches). The default view shows the whole floor at once, so every den is visible without zooming in.
+- **Move around freely.** Drag to pan, scroll or pinch to zoom, arrow keys when focused. Clicking a den's sign, its floor, a fox, or a "needs you" alert flies the camera there; "Whole floor" zooms back out.
+- **One den per repo.** Each den is its own department room, with a floating sign showing the repo name (or its alias) and its status, which turns gold when a fox there needs you. Each den has its own foxes, quest board, and history.
+- **A corner per branch.** Inside a den, each branch gets a corner with a rug in its own colour, a floor tag (`⎇ feat/csp-headers`), and desks for the agents on that branch. Agents on the same branch share the corner; a new branch adds a new corner. Shared stations (bookshelf, server rack, window, burrow, beds, quest board) belong to the whole den.
+- **Desks.** Every agent gets its own desk in its branch's corner, assigned the first time it joins and kept for good, with a nameplate and mug in its colour.
+- Quiet dens dim to their night state; alerts and approvals always carry the repo and branch, so you know what is asking before you go there.
 
 ### Stations
-- **Desk cluster in the middle of the room** — every agent gets its own desk, assigned the first time it joins the den and kept for good, so you learn "Ember's desk". Desks sit in a central group (a ring or facing rows) rather than along the wall; the cluster grows as more agents join and the room expands with it.
-- **Around the walls:** bookshelf · server rack · window/telescope · burrow (subagents) · beds · quest board (task list) · trophy shelf (achievements).
+- **Shared by the whole den, around the walls:** bookshelf · server rack · window/telescope · burrow (subagents) · beds · quest board (task list).
+- **In each branch corner:** that branch's desks.
+- **In the Commons:** trophy cabinet (achievements) · status board for every den.
 
 ### Fox behavior
 - Each fox runs a **state machine**: `idle → walking → working(tool) → waiting → celebrating → sleeping`.
@@ -266,16 +270,16 @@ Kit → Red Fox → Silver Fox → Arctic Fox → Nine-Tailed Kitsune.
 ## 9. Website screens
 
 1. **Landing page** — hero animation of the den, waitlist, "how it works", privacy promise.
-2. **Warren (home)** — every repo den at a glance as live tiles; "needs you" dens float to the top with approve/open actions.
+2. **HQ floor (home)** — every repo den on one explorable floor, with branch corners and a department list in the side panel; "needs you" alerts with approve/go-there actions.
 3. **Den (per repo)** — 3D world + HUD: level/XP bar, live indicator, "needs you" alert bar with approve/open actions.
 4. **Fox detail panel** — current task, timeline, tokens, cost.
 5. **Stats** — daily/weekly recap, time and tokens per quest, cost trends, wait-for-you time; filter by repo or see all.
 6. **Quests & achievements** — quest board, trophy shelf.
 7. **World ladder** — season, league, rank, efficiency score, filters by model tier.
 8. **Profile card** — shareable: verified PRs, avg cost per task, badges.
-9. **Team warren** (paid) — shared dens for the team's repos, team leaderboard, manager insights.
+9. **Team HQ** (paid) — one shared floor with dens for the team's repos, team leaderboard, manager insights.
 10. **Settings** — machines, tokens, privacy (hide targets, repo aliases, local-only), notifications, share links.
-11. **Mobile** — alerts-first view: who needs you across all dens, quick approve/open, compact warren.
+11. **Mobile** — alerts-first view: who needs you across all dens, quick approve/open, compact HQ floor.
 
 ---
 
@@ -304,16 +308,16 @@ Extras: cosmetic packs/seasonal items, cost analytics reports, sponsored integra
 - [ ] `foxhole` CLI + plugin packaging.
 - [ ] Local server + WebSocket, plain live event list.
 - [ ] Iso room with one fox: walk, sit, type, raise paw, sleep.
-- [ ] Multiple foxes, central desk cluster (one desk per agent), stations, subagent cubs.
-- [ ] Route sessions to a den per repo; local warren view of all dens.
+- [ ] Multiple foxes, branch corners (one desk per agent), stations, subagent cubs.
+- [ ] Route sessions to a den per repo and a corner per branch; one local HQ floor with all dens.
 - [ ] Personal XP, levels, achievements (local SQLite).
 - [ ] Publish plugin from this repo.
 
 ### Phase 2 — Hosted (weeks 5–8)
 - [ ] Landing page + waitlist (Cloudflare Pages).
 - [ ] GitHub OAuth, one-time pairing flow, tokens.
-- [ ] Durable Object dens (one per repo) + warren aggregate, persistent history.
-- [ ] Warren/den/share links, Web Push alerts.
+- [ ] Durable Object dens (one per repo) + HQ aggregate, persistent history.
+- [ ] HQ/den/share links, Web Push alerts.
 - [ ] Codex adapter.
 
 ### Phase 3 — Global ladder (weeks 9–12)
@@ -359,8 +363,8 @@ Monorepo with **pnpm workspaces** (or Bun workspaces) + Turborepo.
 - **Impact measurement** — merged PRs miss non-PR work (research, ops); consider later signals (deploys, closed tickets) via integrations.
 - **Token data access** — confirm reliable per-session usage for each agent tool.
 - **Codex hook surface** — verify the best current integration point.
-- **Free-tier limits** — monitor Cloudflare/Supabase quotas; batching keeps usage low. One den per repo means more Durable Objects; idle dens hibernate, and the warren reads summaries rather than full event streams.
-- **Many dens** — someone with dozens of repos needs the warren to stay readable: collapse dens with no activity in the last week, and let people pin favorites.
+- **Free-tier limits** — monitor Cloudflare/Supabase quotas; batching keeps usage low. One den per repo means more Durable Objects; idle dens hibernate, and the HQ floor reads summaries rather than full event streams.
+- **Many dens** — someone with dozens of repos needs the HQ floor to stay readable: lay dens out in a grid that grows with the account, shrink dens with no activity in the last week, and let people pin favorites near the Commons. Branches pile up the same way, so corners for merged or stale branches should fold away.
 - **Asset licensing** — use CC0 only; track licenses in `assets/`.
 - **Trust** — publish the plugin source openly so users can verify exactly what is sent.
 
