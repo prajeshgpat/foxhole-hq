@@ -2,7 +2,7 @@
 
 > See your agents work, know when they need you, and watch them level up.
 
-Foxhole HQ is a plugin + website that turns AI coding agents (Claude Code, Codex, and others) into animated foxes living in a 3D isometric den. Each fox shows what its agent is doing in real time, raises a paw when it needs you, earns XP for verified work, and competes on a global leaderboard that rewards **impact per token** — efficient agents rank highest.
+Foxhole HQ is a plugin + website that turns AI coding agents (Claude Code, Codex, and others) into animated foxes living in 3D isometric dens, one den per repo. Each fox shows what its agent is doing in real time, raises a paw when it needs you, earns XP for verified work, and competes on a global leaderboard that rewards **impact per token** — efficient agents rank highest.
 
 ---
 
@@ -10,7 +10,7 @@ Foxhole HQ is a plugin + website that turns AI coding agents (Claude Code, Codex
 
 | Goal | What success looks like |
 |---|---|
-| **Ambient awareness** | One glance tells you which agents are busy, stuck, done, or waiting on you. |
+| **Ambient awareness** | One glance tells you which agents are busy, stuck, done, or waiting on you, across every repo. |
 | **Never miss a "needs you"** | Permission requests surface instantly (den + phone push). |
 | **Fun** | A game-like world people leave open all day and show their friends. |
 | **Efficiency benchmark** | A fair, verified global ranking of impact vs. token cost. |
@@ -54,7 +54,7 @@ Foxhole HQ is a plugin + website that turns AI coding agents (Claude Code, Codex
                                   │ HTTPS (batched)
                                   ▼
  ┌──────────────── Cloud (Cloudflare) ────────────┐
- │  Worker API  ──▶  Den (Durable Object, 1/user) │
+ │  Worker API  ──▶  Dens (1 Durable Object/repo) │
  │      │              • live state + WebSocket   │
  │      │              • session history (SQLite) │
  │      ▼                                         │
@@ -69,7 +69,9 @@ Foxhole HQ is a plugin + website that turns AI coding agents (Claude Code, Codex
             3D isometric den · HUD · stats · ladder
 ```
 
-**Key principle:** the **den** is the persistent object, owned by the user's account. Sessions come and go inside it. The website connects to the den, never to a single session — so it stays live after any agent session ends.
+**Key principle:** the **den** is the persistent object. Each repo gets its own den, owned by the user's account (or team). Sessions come and go inside it. The website connects to dens, never to a single session — so they stay live after any agent session ends.
+
+An account's dens together form its **warren**: one overview that shows every den at work at a glance. The warren is a thin aggregate that subscribes to a small summary feed from each den (awake/asleep counts, who needs you, current quest), not to every event.
 
 ---
 
@@ -83,7 +85,7 @@ Foxhole HQ is a plugin + website that turns AI coding agents (Claude Code, Codex
 
 ### Backend
 - **Cloudflare Workers** — API + auth endpoints.
-- **Durable Objects** (SQLite-backed) — one den per user/team; holds live state, fans out WebSocket updates.
+- **Durable Objects** (SQLite-backed) — one den per repo per user/team; holds live state, fans out WebSocket updates. One lightweight warren object per account aggregates den summaries for the overview.
 - **D1 or Supabase Postgres** — accounts, verified tasks, leaderboard.
 - **GitHub App** — verifies PRs, merges, CI status, reverts.
 - **Auth** — GitHub OAuth.
@@ -126,9 +128,11 @@ All adapters normalize into one schema:
   "target": "src/auth/session.ts",  // file name or short label only (configurable / hashable)
   "status": "ok",                   // ok | error | waiting
   "usage": { "inputTokens": 1200, "outputTokens": 340, "model": "…" },
-  "repo": "github.com/owner/name"   // optional, used for verification
+  "repo": "github.com/owner/name"   // picks the den; also used for verification
 }
 ```
+
+**Den routing:** the local agent fills `repo` from the session's working directory (its git remote). Every session for the same repo, from any machine or agent tool, lands in that repo's den. A repo with no remote gets a den named after its folder (hashed if targets are hidden), and sessions outside any repo go to a shared **scratch den**.
 
 | Event type | Fox behavior |
 |---|---|
@@ -144,7 +148,7 @@ All adapters normalize into one schema:
 | `session.stop` | Confetti + floating XP, then curls up in bed |
 | `session.end` | Fox sleeps; history stays |
 
-**Privacy defaults:** only tool names, short targets, status, and token usage are sent. No code, prompts, diffs, or file contents — ever. A setting can hash or hide `target` entirely. A **local-only mode** runs the den on `localhost` with nothing leaving the machine.
+**Privacy defaults:** only tool names, short targets, status, and token usage are sent. No code, prompts, diffs, or file contents — ever. A setting can hash or hide `target` entirely, and dens for private repos can show an alias instead of the repo name. A **local-only mode** runs the den on `localhost` with nothing leaving the machine.
 
 **Volume control:** the local agent batches and debounces (e.g., flush once per second, collapse repeated Read events) to keep traffic tiny.
 
@@ -161,14 +165,15 @@ All adapters normalize into one schema:
 
 ### Links
 - **Pairing link** — one-time, connects a machine, then expires.
-- **Den link** — permanent, bookmarkable (`foxhole-hq.com/den/<handle>`).
-- **Share link** — read-only, revocable; for a team TV or a phone without login.
+- **Warren link** — permanent, bookmarkable overview of all your dens (`foxhole-hq.com/<handle>`).
+- **Den link** — permanent, bookmarkable, one per repo (`foxhole-hq.com/<handle>/<repo>`).
+- **Share link** — read-only, revocable; for one den or the whole warren, e.g. a team TV or a phone without login.
 
 ### Persistence
-- Den state lives in a Durable Object; history in SQLite/DB.
+- Each den's state lives in its own Durable Object; history in SQLite/DB.
 - When sessions end, foxes go to bed; the page stays connected and shows a quiet "night" state + daily recap.
-- New sessions wake foxes without a page refresh.
-- Claude Code and Codex agents on the same account share one den (Codex agents could be a different animal).
+- New sessions wake foxes without a page refresh. A session in a repo you haven't used before creates its den automatically, and it appears in the warren.
+- Claude Code and Codex agents working on the same repo share that repo's den (Codex agents could be a different animal).
 
 ---
 
@@ -179,8 +184,15 @@ All adapters normalize into one schema:
 - Soft directional light + shadows, warm lamps.
 - Low-poly / voxel aesthetic, cozy den interior.
 
+### Dens and the warren
+- **One den per repo.** Each den is its own room, titled with the repo name (or its alias), with its own foxes, quest board, and history.
+- **Warren view.** All your dens shown together at a glance, as a grid of small live rooms (or a map of connected burrows). Each tile shows its foxes moving, a count of who's awake, and a gold glow plus "!" on any den where a fox needs you. Click a tile to zoom into that den.
+- Dens sort with "needs you" first, then busiest, then most recent; quiet dens dim to their night state.
+- Alerts and approvals in the warren carry the repo name, so you know which project is asking before you open it.
+
 ### Stations
-Desk row · bookshelf · server rack · window/telescope · burrow (subagents) · beds · quest board (task list) · trophy shelf (achievements).
+- **Desk cluster in the middle of the room** — every agent gets its own desk, assigned the first time it joins the den and kept for good, so you learn "Ember's desk". Desks sit in a central group (a ring or facing rows) rather than along the wall; the cluster grows as more agents join and the room expands with it.
+- **Around the walls:** bookshelf · server rack · window/telescope · burrow (subagents) · beds · quest board (task list) · trophy shelf (achievements).
 
 ### Fox behavior
 - Each fox runs a **state machine**: `idle → walking → working(tool) → waiting → celebrating → sleeping`.
@@ -254,15 +266,16 @@ Kit → Red Fox → Silver Fox → Arctic Fox → Nine-Tailed Kitsune.
 ## 9. Website screens
 
 1. **Landing page** — hero animation of the den, waitlist, "how it works", privacy promise.
-2. **Den (main view)** — 3D world + HUD: level/XP bar, live indicator, "needs you" alert bar with approve/open actions.
-3. **Fox detail panel** — current task, timeline, tokens, cost.
-4. **Stats** — daily/weekly recap, time and tokens per quest, cost trends, wait-for-you time.
-5. **Quests & achievements** — quest board, trophy shelf.
-6. **World ladder** — season, league, rank, efficiency score, filters by model tier.
-7. **Profile card** — shareable: verified PRs, avg cost per task, badges.
-8. **Team den** (paid) — shared world, team leaderboard, manager insights.
-9. **Settings** — machines, tokens, privacy (hide targets, local-only), notifications, share links.
-10. **Mobile** — alerts-first view: who needs you, quick approve/open, compact den.
+2. **Warren (home)** — every repo den at a glance as live tiles; "needs you" dens float to the top with approve/open actions.
+3. **Den (per repo)** — 3D world + HUD: level/XP bar, live indicator, "needs you" alert bar with approve/open actions.
+4. **Fox detail panel** — current task, timeline, tokens, cost.
+5. **Stats** — daily/weekly recap, time and tokens per quest, cost trends, wait-for-you time; filter by repo or see all.
+6. **Quests & achievements** — quest board, trophy shelf.
+7. **World ladder** — season, league, rank, efficiency score, filters by model tier.
+8. **Profile card** — shareable: verified PRs, avg cost per task, badges.
+9. **Team warren** (paid) — shared dens for the team's repos, team leaderboard, manager insights.
+10. **Settings** — machines, tokens, privacy (hide targets, repo aliases, local-only), notifications, share links.
+11. **Mobile** — alerts-first view: who needs you across all dens, quick approve/open, compact warren.
 
 ---
 
@@ -291,15 +304,16 @@ Extras: cosmetic packs/seasonal items, cost analytics reports, sponsored integra
 - [ ] `foxhole` CLI + plugin packaging.
 - [ ] Local server + WebSocket, plain live event list.
 - [ ] Iso room with one fox: walk, sit, type, raise paw, sleep.
-- [ ] Multiple foxes, stations, subagent cubs.
+- [ ] Multiple foxes, central desk cluster (one desk per agent), stations, subagent cubs.
+- [ ] Route sessions to a den per repo; local warren view of all dens.
 - [ ] Personal XP, levels, achievements (local SQLite).
 - [ ] Publish plugin from this repo.
 
 ### Phase 2 — Hosted (weeks 5–8)
 - [ ] Landing page + waitlist (Cloudflare Pages).
 - [ ] GitHub OAuth, one-time pairing flow, tokens.
-- [ ] Durable Object dens, persistent history.
-- [ ] Den/share links, Web Push alerts.
+- [ ] Durable Object dens (one per repo) + warren aggregate, persistent history.
+- [ ] Warren/den/share links, Web Push alerts.
 - [ ] Codex adapter.
 
 ### Phase 3 — Global ladder (weeks 9–12)
@@ -345,7 +359,8 @@ Monorepo with **pnpm workspaces** (or Bun workspaces) + Turborepo.
 - **Impact measurement** — merged PRs miss non-PR work (research, ops); consider later signals (deploys, closed tickets) via integrations.
 - **Token data access** — confirm reliable per-session usage for each agent tool.
 - **Codex hook surface** — verify the best current integration point.
-- **Free-tier limits** — monitor Cloudflare/Supabase quotas; batching keeps usage low.
+- **Free-tier limits** — monitor Cloudflare/Supabase quotas; batching keeps usage low. One den per repo means more Durable Objects; idle dens hibernate, and the warren reads summaries rather than full event streams.
+- **Many dens** — someone with dozens of repos needs the warren to stay readable: collapse dens with no activity in the last week, and let people pin favorites.
 - **Asset licensing** — use CC0 only; track licenses in `assets/`.
 - **Trust** — publish the plugin source openly so users can verify exactly what is sent.
 
