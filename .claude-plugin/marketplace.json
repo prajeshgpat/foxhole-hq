@@ -1,0 +1,11 @@
+{
+  "name": "foxhole-hq",
+  "owner": { "name": "prajeshgpat" },
+  "plugins": [
+    {
+      "name": "foxhole",
+      "source": "./packages/plugin-claude",
+      "description": "See your agents work as foxes in Foxhole HQ. Metadata-only event logging."
+    }
+  ]
+}

@@ -1,0 +1,26 @@
+{
+  "name": "@foxhole-hq/agent",
+  "version": "0.0.0",
+  "private": true,
+  "description": "The foxhole CLI: turns agent hook payloads into metadata-only Foxhole events.",
+  "license": "MIT",
+  "type": "module",
+  "bin": {
+    "foxhole": "./dist/cli.mjs"
+  },
+  "exports": {
+    ".": "./src/index.ts",
+    "./package.json": "./package.json"
+  },
+  "scripts": {
+    "build": "tsup",
+    "test": "vitest run",
+    "typecheck": "tsc -p ."
+  },
+  "dependencies": {
+    "@foxhole-hq/schema": "workspace:*"
+  },
+  "devDependencies": {
+    "tsup": "^9.0.0"
+  }
+}

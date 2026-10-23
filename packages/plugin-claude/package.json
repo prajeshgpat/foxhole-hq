@@ -1,0 +1,14 @@
+{
+  "name": "@foxhole-hq/plugin-claude",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Claude Code plugin: hooks that record metadata-only Foxhole events.",
+  "license": "MIT",
+  "type": "module",
+  "scripts": {
+    "build": "node scripts/bundle.mjs"
+  },
+  "dependencies": {
+    "@foxhole-hq/agent": "workspace:*"
+  }
+}

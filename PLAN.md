@@ -8,15 +8,16 @@ Foxhole HQ is a plugin + website that turns AI coding agents (Claude Code, Codex
 
 ## 1. Goals
 
-| Goal | What success looks like |
-|---|---|
-| **Ambient awareness** | One glance tells you which agents are busy, stuck, done, or waiting on you, across every repo. |
-| **Never miss a "needs you"** | Permission requests surface instantly (den + phone push). |
-| **Fun** | A game-like world people leave open all day and show their friends. |
-| **Efficiency benchmark** | A fair, verified global ranking of impact vs. token cost. |
-| **Trust** | Metadata only by default — never code, prompts, or file contents. |
+| Goal                         | What success looks like                                                                        |
+| ---------------------------- | ---------------------------------------------------------------------------------------------- |
+| **Ambient awareness**        | One glance tells you which agents are busy, stuck, done, or waiting on you, across every repo. |
+| **Never miss a "needs you"** | Permission requests surface instantly (den + phone push).                                      |
+| **Fun**                      | A game-like world people leave open all day and show their friends.                            |
+| **Efficiency benchmark**     | A fair, verified global ranking of impact vs. token cost.                                      |
+| **Trust**                    | Metadata only by default — never code, prompts, or file contents.                              |
 
 ### Non-goals (for now)
+
 - Controlling agents from the website beyond simple approve/deny hand-offs.
 - Storing or analyzing source code.
 - Replacing an agent's own UI or terminal.
@@ -26,16 +27,19 @@ Foxhole HQ is a plugin + website that turns AI coding agents (Claude Code, Codex
 ## 2. Users & use cases
 
 **Solo developer**
+
 - Runs several agents in parallel; glances at the den on a second screen.
 - Gets a phone alert when a fox raises its paw.
 - Reviews an end-of-day recap: quests done, time, tokens, cost.
 
 **Team**
+
 - Shared den showing everyone's agents.
 - Team leaderboard and cost-per-task insights for leads.
 - Great for demos and onboarding people onto agent workflows.
 
 **Global community**
+
 - Opt-in world ladder ranked by verified impact over normalized token cost.
 - Seasons, leagues, profile cards, shareable "most efficient quest" highlights.
 
@@ -78,12 +82,14 @@ An account's dens sit side by side on one **HQ floor**: a single explorable 3D s
 ## 4. Tech stack
 
 ### Capture (local)
+
 - **Claude Code plugin** bundling hooks: `SessionStart`, `UserPromptSubmit`, `PreToolUse`, `PostToolUse`, `Notification`, `SubagentStop`, `Stop`, `SessionEnd`.
 - **Codex adapter**: uses Codex's `notify` setting and/or tails its local session logs (verify current Codex docs for the best hook point).
 - **Generic adapter**: small HTTP/SDK API so any agent framework can send events.
 - Written in **TypeScript (Node/Bun)**, shipped as a single small CLI (`foxhole`) the hooks call.
 
 ### Backend
+
 - **Cloudflare Workers** — API + auth endpoints.
 - **Durable Objects** (SQLite-backed) — one den per repo per user/team; holds live state, fans out WebSocket updates. One lightweight HQ object per account aggregates den summaries for the floor overview.
 - **D1 or Supabase Postgres** — accounts, verified tasks, leaderboard.
@@ -92,6 +98,7 @@ An account's dens sit side by side on one **HQ floor**: a single explorable 3D s
 - **Push** — Web Push + ntfy.sh for phone alerts.
 
 ### Frontend
+
 - **React + Vite + TypeScript**
 - **React Three Fiber + drei** — 3D scene, orthographic isometric camera, map controls, HTML labels.
 - **Zustand** — fox state store driven by WebSocket events.
@@ -100,14 +107,15 @@ An account's dens sit side by side on one **HQ floor**: a single explorable 3D s
 - **Pathfinding** — tile grid + A*.
 
 ### Hosting (free tier to start)
-| Piece | Service |
-|---|---|
-| Website | Cloudflare Pages |
-| API + dens | Cloudflare Workers + Durable Objects (free plan) |
-| DB | D1 or Supabase free |
-| Plugin distribution | This GitHub repo (plugin marketplace) |
-| Waitlist | Tally form or a DB table |
-| Domain | ~$10/yr (only real cost) |
+
+| Piece               | Service                                          |
+| ------------------- | ------------------------------------------------ |
+| Website             | Cloudflare Pages                                 |
+| API + dens          | Cloudflare Workers + Durable Objects (free plan) |
+| DB                  | D1 or Supabase free                              |
+| Plugin distribution | This GitHub repo (plugin marketplace)            |
+| Waitlist            | Tally form or a DB table                         |
+| Domain              | ~$10/yr (only real cost)                         |
 
 ---
 
@@ -118,36 +126,38 @@ All adapters normalize into one schema:
 ```jsonc
 {
   "v": 1,
+  "id": "6f1c2b9e-…", // UUID, so retries and replays can be de-duplicated
   "ts": "2026-10-21T19:04:11.512Z",
-  "source": "claude-code",          // claude-code | codex | sdk | ...
+  "source": "claude-code", // claude-code | codex | sdk | ...
   "machineId": "m_8f2…",
   "sessionId": "s_41a…",
-  "parentSessionId": null,          // set for subagents ("cubs")
-  "type": "tool.start",             // see table below
-  "tool": "Edit",                   // Read | Edit | Write | Bash | WebSearch | Task | ...
-  "target": "src/auth/session.ts",  // file name or short label only (configurable / hashable)
-  "status": "ok",                   // ok | error | waiting
+  "parentSessionId": null, // set for subagents ("cubs")
+  "type": "tool.start", // see table below
+  "tool": "Edit", // Read | Edit | Write | Bash | WebSearch | Task | ...
+  "target": "src/auth/session.ts", // file name or short label only (configurable / hashable)
+  "status": "ok", // ok | error | waiting
   "usage": { "inputTokens": 1200, "outputTokens": 340, "model": "…" },
-  "repo": "github.com/owner/name",  // picks the den; also used for verification
-  "branch": "feat/csp-headers"      // picks the branch corner inside the den
+  "repo": "github.com/owner/name", // picks the den; also used for verification
+  "branch": "feat/csp-headers", // picks the branch corner inside the den
 }
 ```
 
 **Den routing:** the local agent fills `repo` from the session's working directory (its git remote). Every session for the same repo, from any machine or agent tool, lands in that repo's den. The local agent also reads the current git branch, which picks the branch corner inside the den; a subagent inherits its parent's branch. A repo with no remote gets a den named after its folder (hashed if targets are hidden), and sessions outside any repo go to a shared **scratch den**.
 
-| Event type | Fox behavior |
-|---|---|
-| `session.start` | Fox wakes up / walks into the den |
-| `prompt.submit` | Fox receives a scroll (new quest) |
-| `tool.start` Read/Grep/Glob | Walks to bookshelf, reading animation |
-| `tool.start` Edit/Write | Sits at desk, typing loop, monitor glows |
-| `tool.start` Bash | Walks to server rack, rack blinks |
-| `tool.start` WebSearch/WebFetch | Walks to window / telescope |
-| `tool.start` Task (subagent) | A cub pops out of a burrow and runs off |
-| `permission.request` | Stands, raises paw, bouncing "!", light beam, push alert |
-| `tool.end` status=error | Small stumble + puff of smoke |
-| `session.stop` | Confetti + floating XP, then curls up in bed |
-| `session.end` | Fox sleeps; history stays |
+| Event type                      | Fox behavior                                                               |
+| ------------------------------- | -------------------------------------------------------------------------- |
+| `session.start`                 | Fox wakes up / walks into the den                                          |
+| `prompt.submit`                 | Fox receives a scroll (new quest)                                          |
+| `tool.start` Read/Grep/Glob     | Walks to bookshelf, reading animation                                      |
+| `tool.start` Edit/Write         | Sits at desk, typing loop, monitor glows                                   |
+| `tool.start` Bash               | Walks to server rack, rack blinks                                          |
+| `tool.start` WebSearch/WebFetch | Walks to window / telescope                                                |
+| `tool.start` Task (subagent)    | A cub pops out of a burrow and runs off                                    |
+| `permission.request`            | Stands, raises paw, bouncing "!", light beam, push alert                   |
+| `session.waiting`               | Agent is idle waiting for your next message: fox sits and looks toward you |
+| `tool.end` status=error         | Small stumble + puff of smoke                                              |
+| `session.stop`                  | Confetti + floating XP, then curls up in bed                               |
+| `session.end`                   | Fox sleeps; history stays                                                  |
 
 **Privacy defaults:** only tool names, short targets, status, and token usage are sent. No code, prompts, diffs, or file contents — ever. A setting can hash or hide `target` entirely, and dens for private repos can show an alias instead of the repo name. A **local-only mode** runs the den on `localhost` with nothing leaving the machine.
 
@@ -158,6 +168,7 @@ All adapters normalize into one schema:
 ## 6. Connecting & staying connected
 
 ### One-time pairing (device flow)
+
 1. Install plugin → run `/foxhole connect`.
 2. Plugin prints a one-time link, e.g. `foxhole-hq.com/pair/K7F-29Q`.
 3. User clicks, signs in with GitHub, confirms.
@@ -165,12 +176,14 @@ All adapters normalize into one schema:
 5. Every future session on that machine auto-connects. Nothing to redo.
 
 ### Links
+
 - **Pairing link** — one-time, connects a machine, then expires.
 - **HQ link** — permanent, bookmarkable view of your whole floor (`foxhole-hq.com/<handle>`).
 - **Den link** — permanent, bookmarkable, one per repo (`foxhole-hq.com/<handle>/<repo>`).
 - **Share link** — read-only, revocable; for one den or the whole HQ floor, e.g. a team TV or a phone without login.
 
 ### Persistence
+
 - Each den's state lives in its own Durable Object; history in SQLite/DB.
 - When sessions end, foxes go to bed; the page stays connected and shows a quiet "night" state + daily recap.
 - New sessions wake foxes without a page refresh. A session in a repo you haven't used before creates its den automatically, and it appears on the HQ floor. A session on a new branch gets a new branch corner in that den.
@@ -181,11 +194,13 @@ All adapters normalize into one schema:
 ## 7. The 3D isometric world
 
 ### Rendering
+
 - Three.js via React Three Fiber, **orthographic camera** at the classic isometric angle (rotate in 90° steps, zoom, pan).
 - Soft directional light + shadows, warm lamps.
 - Low-poly / voxel aesthetic, cozy den interior.
 
 ### The HQ floor, dens, and branch corners
+
 - **One HQ floor.** All your dens sit on one continuous isometric floor, like departments in an office, linked by corridors and a shared **Commons** (trophy cabinet, a status board with a light per fox, couches). The default view shows the whole floor at once, so every den is visible without zooming in.
 - **Move around freely.** Drag to pan, scroll or pinch to zoom, arrow keys when focused. Clicking a den's sign, its floor, a fox, or a "needs you" alert flies the camera there; "Whole floor" zooms back out.
 - **One den per repo.** Each den is its own department room, with a floating sign showing the repo name (or its alias) and its status, which turns gold when a fox there needs you. Each den has its own foxes, quest board, and history.
@@ -194,23 +209,27 @@ All adapters normalize into one schema:
 - Quiet dens dim to their night state; alerts and approvals always carry the repo and branch, so you know what is asking before you go there.
 
 ### Stations
+
 - **Shared by the whole den, around the walls:** bookshelf · server rack · window/telescope · burrow (subagents) · beds · quest board (task list).
 - **In each branch corner:** that branch's desks.
 - **In the Commons:** trophy cabinet (achievements) · status board for every den.
 
 ### Fox behavior
+
 - Each fox runs a **state machine**: `idle → walking → working(tool) → waiting → celebrating → sleeping`.
 - **Event queue per fox**: animations finish their walk before the next action, so rapid hook events never cause flicker.
 - A* pathfinding over the tile grid.
 - Floating HTML label above each fox: name, current task, status pill.
 
 ### Juice
+
 - Day/night cycle tied to local time.
 - Floating XP numbers, confetti on quest completion, achievement toasts.
 - Click a fox → camera eases in, side panel shows its task, timeline, tokens.
 - Unlockable decor as you level up (plants, rugs, lamps, bigger den, seasonal items).
 
 ### Performance (runs all day)
+
 - Cap device pixel ratio, instanced props, pause render loop when the tab is hidden, low-power mode toggle.
 - Lightweight 2D fallback view for low-end devices / mobile.
 
@@ -219,49 +238,57 @@ All adapters normalize into one schema:
 ## 8. Gamification
 
 ### Personal progression (your den)
+
 - **XP** for completed quests, files touched, tests passing.
 - **Levels** unlock cosmetics.
 - **Streaks** for consecutive active days.
-- **Achievements**, e.g. *First Quest*, *100 Edits*, *Zero-Error Shift*, *Cub Wrangler* (5 subagents in one quest), *Night Owl*, *Lean Machine* (top-10% efficiency on a quest).
+- **Achievements**, e.g. _First Quest_, _100 Edits_, _Zero-Error Shift_, _Cub Wrangler_ (5 subagents in one quest), _Night Owl_, _Lean Machine_ (top-10% efficiency on a quest).
 
 Personal XP counts every completed task — fun and motivating, but **not** used for global rank.
 
 ### Global ranking: impact over tokens
+
 Ranking spans **all users worldwide** and rewards efficient agents.
 
 #### Verified impact (via GitHub App — never self-reported)
-| Signal | Role |
-|---|---|
-| PR merged | Base unit of impact |
-| CI/tests green on merge | Multiplier |
-| Survives 14 days (not reverted/rewritten) | Points confirmed after a delay |
-| Linked issue closed | Bonus, weighted by labels (bug, feature) |
-| Change size & repo size | Log-scaled difficulty factor |
+
+| Signal                                    | Role                                     |
+| ----------------------------------------- | ---------------------------------------- |
+| PR merged                                 | Base unit of impact                      |
+| CI/tests green on merge                   | Multiplier                               |
+| Survives 14 days (not reverted/rewritten) | Points confirmed after a delay           |
+| Linked issue closed                       | Bonus, weighted by labels (bug, feature) |
+| Change size & repo size                   | Log-scaled difficulty factor             |
 
 Tasks without a verifiable outcome earn personal XP only.
 
 #### Score
+
 ```
 task_score   = impact_points / normalized_token_cost
 impact_points = base × ci_mult × survival_mult × issue_bonus × log(1 + difficulty)
 ```
 
 **Safeguards**
+
 - **Normalize tokens** to a cost-equivalent per model, and/or rank within **model-tier leagues**.
 - **Log-scale impact** + minimum impact threshold, so trivial one-liners can't dominate.
 - **Bayesian smoothing**: player rating shrinks toward the global mean until ~20+ verified tasks.
 - **Seasons**: monthly ladders with resets.
 
 #### Leagues
+
 Kit → Red Fox → Silver Fox → Arctic Fox → Nine-Tailed Kitsune.
 
 #### Anti-gaming
+
 - Events signed with the pairing token; token usage read from local session data.
 - Cross-check token totals against verified outcome size (huge PR + tiny usage = flag).
 - Detect farm repos, self-merged PRs in solo repos, sudden efficiency spikes → reduced weight or excluded.
 - Public repos only for the world ladder by default.
 
 #### Privacy
+
 - Global ranking is **opt-in**, pseudonymous (fox names).
 - Private repos can count toward a **private team board** only.
 
@@ -285,12 +312,12 @@ Kit → Red Fox → Silver Fox → Arctic Fox → Nine-Tailed Kitsune.
 
 ## 10. Monetization
 
-| Tier | Price (draft) | Includes |
-|---|---|---|
-| **Free** | $0 | Local mode, one den, basic animations, 7-day history, world ladder |
-| **Pro** | $5–8/mo | Hosted den from any device, phone push alerts, unlimited history, all achievements & cosmetics |
-| **Team** | $10–15/user/mo | Shared den, team ladder, manager dashboard (cost/time per task), Slack alerts |
-| **Enterprise** | Custom | Self-hosting, SSO, audit logs, data retention controls |
+| Tier           | Price (draft)  | Includes                                                                                       |
+| -------------- | -------------- | ---------------------------------------------------------------------------------------------- |
+| **Free**       | $0             | Local mode, one den, basic animations, 7-day history, world ladder                             |
+| **Pro**        | $5–8/mo        | Hosted den from any device, phone push alerts, unlimited history, all achievements & cosmetics |
+| **Team**       | $10–15/user/mo | Shared den, team ladder, manager dashboard (cost/time per task), Slack alerts                  |
+| **Enterprise** | Custom         | Self-hosting, SSO, audit logs, data retention controls                                         |
 
 Extras: cosmetic packs/seasonal items, cost analytics reports, sponsored integrations.
 
@@ -301,10 +328,13 @@ Extras: cosmetic packs/seasonal items, cost analytics reports, sponsored integra
 ## 11. Roadmap
 
 ### Phase 0 — Prove the data (week 1)
-- [ ] Claude Code hooks log normalized events to a local file.
-- [ ] Confirm token usage can be read per session.
+
+- [x] Claude Code hooks log normalized events to a local file (`packages/plugin-claude`, verified in a real session).
+- [x] Confirm token usage can be read per session (incremental transcript reader in `packages/agent`).
+- [ ] Run on a few real working sessions; confirm Notification (permission) and SubagentStop payloads.
 
 ### Phase 1 — Local MVP (weeks 2–4)
+
 - [ ] `foxhole` CLI + plugin packaging.
 - [ ] Local server + WebSocket, plain live event list.
 - [ ] Iso room with one fox: walk, sit, type, raise paw, sleep.
@@ -314,6 +344,7 @@ Extras: cosmetic packs/seasonal items, cost analytics reports, sponsored integra
 - [ ] Publish plugin from this repo.
 
 ### Phase 2 — Hosted (weeks 5–8)
+
 - [ ] Landing page + waitlist (Cloudflare Pages).
 - [ ] GitHub OAuth, one-time pairing flow, tokens.
 - [ ] Durable Object dens (one per repo) + HQ aggregate, persistent history.
@@ -321,12 +352,14 @@ Extras: cosmetic packs/seasonal items, cost analytics reports, sponsored integra
 - [ ] Codex adapter.
 
 ### Phase 3 — Global ladder (weeks 9–12)
+
 - [ ] GitHub App verification (merge, CI, survival, issues).
 - [ ] Scoring service, normalization, smoothing.
 - [ ] Seasons, leagues, profile cards.
 - [ ] Anti-gaming checks.
 
 ### Phase 4 — Teams & monetization
+
 - [ ] Team dens, team ladder, manager insights.
 - [ ] Billing (Stripe), Pro/Team tiers.
 - [ ] Cosmetic shop, seasonal events.
@@ -353,7 +386,7 @@ foxhole-hq/
 └── assets/             # CC0 models, textures, sounds (with licenses)
 ```
 
-Monorepo with **pnpm workspaces** (or Bun workspaces) + Turborepo.
+Monorepo with **pnpm workspaces** + **Turborepo**, TypeScript everywhere, Zod for the event contract, Vitest, ESLint + Prettier, tsup for bundles, Changesets for versioning, GitHub Actions for CI and releases. Work lands on `dev`; `main` only moves through reviewed PRs with green CI, and every push to `main` runs the release workflow.
 
 ---
 
