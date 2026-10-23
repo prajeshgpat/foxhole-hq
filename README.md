@@ -91,6 +91,10 @@ node packages/plugin-claude/dist/foxhole.mjs stats    # sessions, tool calls, to
 
 Events are written to `~/.foxhole/events.jsonl`. Put `{ "targets": "hash" }` or `{ "targets": "hidden" }` in `~/.foxhole/config.json` to hash or drop file names and commands. Set `FOXHOLE_DEBUG_SHAPES=1` to also log which keys each hook payload had (names only, never values), which helps when Claude Code adds new hook fields.
 
+### Test from your phone (cloud sessions)
+
+This repo dogfoods itself: `.claude/settings.json` wires the same hooks to the committed bundle, so any Claude Code session working on this repo records events, including cloud sessions started from the Claude app on a phone. Nothing to install or build. Ask Claude in that session to run `node packages/plugin-claude/dist/foxhole.mjs stats` (or `tail`) to see what was recorded. The repo hooks also set `FOXHOLE_DEBUG_SHAPES=1`, so `~/.foxhole/payload-shapes.jsonl` shows which fields each hook received (names only). Cloud containers are temporary, so check the log before the session ends.
+
 Once this is on `main`, it can also be installed as a plugin: `/plugin marketplace add prajeshgpat/foxhole-hq`, then `/plugin install foxhole@foxhole-hq`.
 
 ## Contributing
