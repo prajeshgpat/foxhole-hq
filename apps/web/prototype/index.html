@@ -236,15 +236,23 @@ const TW = 64, TH = 32, COLS = 11, ROWS = 9, WH = 100, PART = 26;
 const P = { floorA: '#6f4d36', floorB: '#674731', hallA: '#4b433b', hallB: '#463e36', wallR: '#432f24', wallL: '#382820', base: '#2b1e17', part: '#5a4536',
   desk: '#a0714a', mon: '#20272b', scrOn: '#9be6ff', scrDim: '#2a4450', shelf: '#7b5337', rack: '#2c3339', cush: '#b98e66', cushIn: '#dcb991',
   dirt: '#56392a', hole: '#140d0a', brass: '#c99a4a', cork: '#a77d52', pot: '#b0613f', leaf: '#5f9a5a',
-  grassA: '#35512c', grassB: '#314b29', blade: '#4b7039', lip: '#3f6232', soil: '#4a3323', strata: '#3a281b' };
+  grassA: '#35512c', grassB: '#314b29', blade: '#4b7039', soil: '#4a3323',
+  bank: '#5d5034', water: '#2f5f78', ripple: 'rgba(190,225,240,.45)',
+  lobby: '#7a5c42', lobbyB: '#735640', couch: '#3f6f78', gold: '#e7b84a' };
 
-/* ---------- the floor plan: a basement dug into a lawn, one room per repo with an active session ----------
-   Rooms sit side by side along the back wall. Open rooms pack left to right, so the basement widens
-   when a room opens and narrows when one closes. The lawn is level with the wall tops. */
-const ROOM_W = 11;                // tiles per room along the back wall (= COLS)
-const BH = 9;                     // basement depth (= ROWS)
-const LAWN = 4;                   // tiles of lawn shown around the basement
-let BW = 0;                       // current basement width; follows the room animations
+/* ---------- the grounds: one lawn, the Commons in the middle, a room per active repo around it ----------
+   Rooms are rounded pits dug into the lawn, cut away at the front so you can look in; the grass is level
+   with the top of their walls. Repo rooms take the slots around the Commons as their sessions start and
+   give them back once they close. */
+const ROOM_W = 11, BH = 9;        // room size in tiles (= COLS, ROWS)
+const ROOM_R = 1.4;               // corner radius of a room, in tiles
+const GAP_X = 7, GAP_Y = 7;       // lawn between neighbouring rooms
+const CELL_W = ROOM_W + GAP_X, CELL_H = BH + GAP_Y;
+// slots around the Commons, filled in this order
+const RING = [[1, 0], [-1, 0], [0, -1], [0, 1], [1, -1], [-1, 1], [-1, -1], [1, 1]];
+// on screen a room's floor hangs this far (in tiles, along x and y) in front of its rim; that strip of lawn stays clear
+const CUTAWAY = WH / TH;
+const LAWN = 4;                   // lawn framed around the rooms by "Whole floor"
 const RUGS = [['#3d5a80', '#5b7fa8'], ['#8d3c2f', '#b2563f'], ['#3f6b4f', '#5f9270']];
 const HOLE_X = 6.45;              // each room's wall hole (and the grass hole above it), in room tiles
 const GRASS_HOLE_Y = -2.4;        // the grass hole sits this far behind the back wall
@@ -296,6 +304,10 @@ const ICON = {
   quest: ['xxxxxx', 'x....x', 'x.xx.x', 'x....x', 'xxxxxx'],
   bang: ['x', 'x', 'x', '.', 'x'],
   think: ['xx.xx.xx', 'xx.xx.xx'],
+  game: ['xxxxxxx', 'x.xxx.x', 'xxxxxxx', '.x...x.'],
+  food: ['.xxx.', 'xx.xx', 'xxxxx', '.xxx.'],
+  drink: ['xxxx.', 'x..xx', 'x..xx', 'xxxx.'],
+  pong: ['xx...', 'xx..x', '.x...'],
 };
 const INK = '#1b1714', PX = 2.4;
 function pix(rows, ox, oy, pal, flip, p) {
@@ -329,7 +341,7 @@ const ST = {
   burrow: i => [{ x: HOLE_X - 0.6, y: 1.0, face: 1 }, { x: HOLE_X + 0.6, y: 1.05, face: -1 }][i % 2],
   bed: k => ({ x: [2.4, 4.3, 6.2, 8.0][k % 4], y: 7.75, face: 1 }),
 };
-const BASE_BLOCK = ['0,3', '0,4', '0,5', '0,6', '9,1', '10,0', '2,0', '3,0'];
+const BASE_BLOCK = ['0,3', '0,4', '0,5', '0,6', '9,1', '9,7', '2,0', '3,0'];
 function rebuildBlocked(d) {
   d.blocked = new Set(BASE_BLOCK);
   d.foxes.filter(f => !f.isCub).forEach(f => {
@@ -414,7 +426,7 @@ function addAgent(d, a) {
 // t runs 0→1 while a room opens (and back while it closes); grow is the eased share of its width on the floor
 function makeDen(repo, i) {
   return { id: 'd' + i, idx: i, repo, name: repo.replace('github.com/', ''), ox: 0, oy: 0,
-    rug: RUGS[i % RUGS.length], foxes: [], parts: [], branches: [], later: [], open: false, t: 0, grow: 0, quiet: 0 };
+    rug: RUGS[i % RUGS.length], foxes: [], parts: [], branches: [], later: [], open: false, t: 0, grow: 0, quiet: 0, slot: null };
 }
 const DENS = (LIVE ? [] : DEN_DEFS).map((def, i) => {
   const d = { ...makeDen(def.repo, i), later: def.later || [] };
@@ -429,7 +441,7 @@ const DENS = (LIVE ? [] : DEN_DEFS).map((def, i) => {
 const wpos = f => isoAbs(f.x + f.den.ox, f.y + f.den.oy, f.z || 0);
 // a new fox trots across the lawn, dives down its room's grass hole and pops out of the wall hole
 function enterViaHoles(f, then) {
-  Object.assign(f, { x: HOLE_X + 2.2, y: GRASS_HOLE_Y - 0.5, z: WH, path: [[HOLE_X, GRASS_HOLE_Y]], travel: true,
+  Object.assign(f, { x: HOLE_X + 2.2 + R() * 1.5, y: GRASS_HOLE_Y - 0.4 - R() * 0.8, z: WH, path: [[HOLE_X, GRASS_HOLE_Y]], travel: true,
     state: 'walking', cur: { k: 'dive' }, entering: true, afterEntry: then });
 }
 function popOut(f) {
@@ -538,6 +550,8 @@ function arrive(f) {
   else if (s.k === 'rest') { f.state = 'sleeping'; f.target = null; f.timer = rnd(18, 30); f.steps = [{ k: 'start' }]; emit(f, 'session.end'); }
   else if (s.k === 'home') { emit(f, 'subagent.stop', { status: 'ok' }); burst(f, 'smoke', 6); f.den.foxes = f.den.foxes.filter(o => o !== f); }
   else if (s.k === 'dive') { f.state = 'diving'; f.dive = 0; }
+  else if (s.k === 'pace') { f.state = 'idle'; f.timer = rnd(1, 2.2); }
+  else if (s.k === 'hang') { Object.assign(f, { state: s.h.state, act: s.h.act || null, target: null, z: s.h.z || 0, timer: s.h.state === 'sleeping' ? rnd(14, 26) : rnd(8, 18) }); }
   else if (s.k === 'popOut') {
     Object.assign(f, { state: 'idle', cur: null, target: null, entering: false });
     const then = f.afterEntry; f.afterEntry = null; if (then) then(f);
@@ -590,10 +604,11 @@ function burst(f, kind, n) {
   }
 }
 function tick(dt) {
-  for (const d of DENS) {
+  for (const d of [COMMONS, ...DENS]) {
     for (const j of d.later) if (!j.done && simT >= j.at) { j.done = true; join(d, j.agent); }
     for (const f of [...d.foxes]) {
       if (f.scroll > 0) f.scroll -= dt;
+      if (f.state === 'working' || (f.turnOpen && f.cur?.k === 'pace')) emitGlyph(d, f, dt);
       if (f.state === 'sleeping') { f.zT -= dt; if (f.zT <= 0) { f.zT = 1.3; const [sx, sy] = wpos(f); d.parts.push({ kind: 'z', x: sx + 8, y: sy - 20, vx: 8, vy: -16, life: 2.2, max: 2.2 }); } }
       if (f.travel) {
         const p = f.path[0], dx = p[0] - f.x, dy = p[1] - f.y, dist = Math.hypot(dx, dy), step = f.speed * dt;
@@ -606,6 +621,7 @@ function tick(dt) {
       }
       if (f.state === 'diving') { f.dive += dt; if (f.dive >= DIVE_T) popOut(f); continue; }
       if (f.live) { liveTick(f, dt); continue; }
+      if (f.lounger) { loungerTick(f, dt); continue; }
       if (f.state === 'waiting') { if (simT - f.waitSince > 25) decide(f, true); continue; }
       if (f.timer > 0) { f.timer -= dt; if (f.timer <= 0) timerDone(f); continue; }
       if (!f.cur) advance(f);
@@ -618,6 +634,8 @@ function tick(dt) {
     }
   }
   layoutRooms(dt);
+  syncLoungers();
+  tickWildlife(dt);
 }
 const easeOutBack = t => 1 + 2.7 * (t - 1) ** 3 + 1.7 * (t - 1) ** 2;
 // Opens a room as soon as one of its foxes is awake and closes it once they all sleep and nothing has happened
@@ -629,19 +647,25 @@ function idleFor(d) {
   return (Date.now() - last) / 1000;
 }
 function layoutRooms(dt) {
-  let x = 0;
   for (const d of DENS) {
     const active = d.foxes.some(f => !f.isCub && f.state !== 'sleeping');
     d.quiet = active ? 0 : d.quiet + dt;
     const open = active || idleFor(d) < ROOM_IDLE;
-    if (open !== d.open) { d.open = open; burst({ den: d, x: ROOM_W / 2, y: BH / 2 }, 'smoke', 16); }
-    d.t = Math.min(1, Math.max(0, d.t + (open ? dt : -dt) / ROOM_ANIM));
+    if (open && d.slot == null) d.slot = freeSlot(); // stays null while every slot is taken
+    if (d.slot != null) { d.ox = RING[d.slot][0] * CELL_W; d.oy = RING[d.slot][1] * CELL_H; }
+    if (open !== d.open) { d.open = open; if (d.slot != null) burst({ den: d, x: ROOM_W / 2, y: BH / 2 }, 'smoke', 16); }
+    d.t = Math.min(1, Math.max(0, d.t + (open && d.slot != null ? dt : -dt) / ROOM_ANIM));
     d.grow = open ? easeOutBack(d.t) : d.t ** 3;
-    d.ox = x; x += ROOM_W * d.grow;
+    if (!open && d.t === 0) d.slot = null;
   }
-  BW = x;
 }
-const openDens = () => DENS.filter(d => d.grow > 0.01);
+function freeSlot() {
+  const used = new Set(DENS.map(d => d.slot));
+  const i = RING.findIndex((_, k) => !used.has(k));
+  return i < 0 ? null : i;
+}
+const openDens = () => DENS.filter(d => d.slot != null && d.grow > 0.01);
+const roomShown = d => d.slot != null && d.grow > 0.05;
 
 /* ---------- drawing: building shell ---------- */
 function windowOnBack(x0, x1, t) {
@@ -654,57 +678,43 @@ function windowOnBack(x0, x1, t) {
   const mid = (x0 + x1) / 2; line(iso(mid, 0, z0), iso(mid, 0, z1), P.base, 2); line(iso(x0, 0, 58), iso(x1, 0, 58), P.base, 2);
   box(x0 - 0.1, 0, x1 - x0 + 0.2, 0.16, 3, 31, B(P.shelf));
 }
-const SOIL_DEPTH = -12;
-// a cut face of the lawn: soil from below the floor up to the grass, with a grass lip and a few strata lines
-function soilFace(a, b) {
-  poly([iso(...a, SOIL_DEPTH), iso(...b, SOIL_DEPTH), iso(...b, WH), iso(...a, WH)], P.soil);
-  [22, 47, 71].forEach(z => line(iso(...a, z), iso(...b, z), P.strata, 1.5));
-  poly([iso(...a, WH - 7), iso(...b, WH - 7), iso(...b, WH), iso(...a, WH)], P.lip);
+const SOIL_DEPTH = -16;
+// a rounded rectangle's outline in tile coordinates, each corner sampled as a short arc
+function rrPoints(x0, y0, x1, y1, r, seg = 5) {
+  const pts = [];
+  const corner = (cx, cy, a0) => { for (let k = 0; k <= seg; k++) { const a = a0 + (k / seg) * Math.PI / 2; pts.push([cx + r * Math.cos(a), cy + r * Math.sin(a)]); } };
+  corner(x1 - r, y0 + r, -Math.PI / 2); corner(x1 - r, y1 - r, 0); corner(x0 + r, y1 - r, Math.PI / 2); corner(x0 + r, y0 + r, Math.PI);
+  return pts;
 }
-// a lawn tile, cut to [x0,x1] so the lawn can grow smoothly with the basement; some tiles get a tuft
-function lawnTile(i, j, x0, x1) {
-  poly([iso(x0, j, WH), iso(x1, j, WH), iso(x1, j + 1, WH), iso(x0, j + 1, WH)], (i + j) % 2 ? P.grassA : P.grassB);
-  const r = ((i * 73856093) ^ (j * 19349663)) >>> 0;
-  if (r % 3 || x1 - x0 < 0.6) return;
-  const u = x0 + 0.2 + (r % 7) / 10 * (x1 - x0 - 0.3), v = j + 0.25 + (r % 5) / 10;
-  [-0.08, 0, 0.08].forEach((d, k) => line(iso(u + d, v, WH), iso(u + d * 1.6, v - 0.05, WH + 6 + (k % 2) * 3), P.blade, 1.4));
+const PIT_EDGE = rrPoints(0, 0, ROOM_W, BH, ROOM_R);
+const PIT_RIM = rrPoints(-0.35, -0.35, ROOM_W + 0.35, BH + 0.35, ROOM_R + 0.35);
+// each stretch of a room's edge: walls are drawn only where they face the viewer (the back), back to front
+const PIT_SEGS = PIT_EDGE.map((p, i) => {
+  const q = PIT_EDGE[(i + 1) % PIT_EDGE.length], m = [(p[0] + q[0]) / 2, (p[1] + q[1]) / 2];
+  let n = [q[1] - p[1], p[0] - q[0]];
+  if (n[0] * (ROOM_W / 2 - m[0]) + n[1] * (BH / 2 - m[1]) < 0) n = [-n[0], -n[1]];
+  return { p, q, back: n[0] + n[1] > 0, leftish: n[0] > n[1], depth: m[0] + m[1] };
+}).sort((a, b) => a.depth - b.depth);
+function tracePath(pts, z) {
+  ctx.beginPath();
+  pts.forEach((p, i) => { const s = iso(p[0], p[1], z); if (i) ctx.lineTo(s[0], s[1]); else ctx.moveTo(s[0], s[1]); });
+  ctx.closePath();
 }
-// The lawn wraps the basement's back and left sides at wall-top height. Its front and right ends are cut away
-// so you look into the basement from the front, like a cross-section of the ground.
-function drawLawn() {
-  OFF = [0, 0];
-  const xEnd = BW + LAWN;
-  soilFace([xEnd, -LAWN], [xEnd, 0]);
-  soilFace([BW, 0], [xEnd, 0]);
-  soilFace([-LAWN, BH], [0, BH]);
-  soilFace([0, 0], [0, BH]); // hidden behind the left wall whenever a room is open
-  for (let j = -LAWN; j < BH; j++) {
-    const right = j < 0 ? xEnd : 0;
-    for (let i = -LAWN; i < right; i++) lawnTile(i, j, i, Math.min(i + 1, right));
-  }
-  openDens().forEach(d => {
-    ctx.globalAlpha = Math.min(1, d.grow);
-    const c = iso(d.ox + HOLE_X, GRASS_HOLE_Y, WH);
-    ell(c[0], c[1], 30, 14, P.dirt); ell(c[0], c[1] + 1, 19, 8, P.hole);
-    ctx.globalAlpha = 1;
+// a room as a pit in the lawn: dug rim, back walls, the cut soil below the front edge, then a tiled floor
+function drawPitShell(floorA, floorB) {
+  tracePath(PIT_RIM, WH); ctx.fillStyle = P.dirt; ctx.fill();
+  PIT_SEGS.filter(s => !s.back).forEach(s => poly([iso(...s.p, SOIL_DEPTH), iso(...s.q, SOIL_DEPTH), iso(...s.q, 0), iso(...s.p, 0)], P.soil));
+  PIT_SEGS.filter(s => s.back).forEach(s => {
+    poly([iso(...s.p, 0), iso(...s.q, 0), iso(...s.q, WH), iso(...s.p, WH)], s.leftish ? P.wallL : P.wallR);
+    poly([iso(...s.p, 0), iso(...s.q, 0), iso(...s.q, 6), iso(...s.p, 6)], P.base);
   });
-}
-function drawShell(t) {
-  OFF = [0, 0];
-  if (BW < 0.01) return;
-  // the floor slab's cut edges
-  poly([iso(0, BH), iso(BW, BH), iso(BW, BH, SOIL_DEPTH), iso(0, BH, SOIL_DEPTH)], '#241a14');
-  poly([iso(BW, 0), iso(BW, BH), iso(BW, BH, SOIL_DEPTH), iso(BW, 0, SOIL_DEPTH)], '#1c1410');
-  poly([iso(0, 0), iso(BW, 0), iso(BW, BH), iso(0, BH)], P.hallA);
-  poly([iso(0, 0), iso(BW, 0), iso(BW, 0, WH), iso(0, 0, WH)], P.wallR);
-  poly([iso(0, 0), iso(0, BH), iso(0, BH, WH), iso(0, 0, WH)], P.wallL);
-  for (let x = 1; x < BW; x++) line(iso(x, 0), iso(x, 0, WH), 'rgba(0,0,0,.13)');
-  for (let y = 1; y < BH; y++) line(iso(0, y), iso(0, y, WH), 'rgba(0,0,0,.13)');
-  poly([iso(0, 0), iso(BW, 0), iso(BW, 0, 6), iso(0, 0, 6)], P.base);
-  poly([iso(0, 0), iso(0, BH), iso(0, BH, 6), iso(0, 0, 6)], P.base);
-  ctx.lineJoin = 'round'; ctx.strokeStyle = P.base; ctx.lineWidth = 4; ctx.beginPath();
-  ctx.moveTo(...iso(0, BH, WH)); ctx.lineTo(...iso(0, 0, WH)); ctx.lineTo(...iso(BW, 0, WH)); ctx.stroke();
-  openDens().forEach(d => { if (d.grow > 0.9) windowOnBack(d.ox + 8.4, d.ox + 10.2, t); });
+  ctx.save(); tracePath(PIT_EDGE, 0); ctx.clip();
+  for (let i = 0; i < COLS; i++) for (let j = 0; j < ROWS; j++)
+    poly([iso(i, j), iso(i + 1, j), iso(i + 1, j + 1), iso(i, j + 1)], (i + j) % 2 ? floorA : floorB);
+  ctx.restore();
+  ctx.lineCap = 'round';
+  PIT_SEGS.filter(s => s.back).forEach(s => line(iso(...s.p, WH), iso(...s.q, WH), P.base, 3));
+  ctx.lineCap = 'butt';
 }
 // the room's way in and out: an arched hole in the back wall, below its grass hole
 function drawWallHole() {
@@ -718,15 +728,9 @@ function drawWallHole() {
 }
 
 /* ---------- drawing: one department room (local coords, OFF = room origin) ---------- */
-function partitions(o, color) {
-  const c = B(color || P.part);
-  if (o.oy > 0) { box(0, -0.14, 4.5, 0.14, PART, 0, c); box(6.5, -0.14, 4.5, 0.14, PART, 0, c); }
-  if (o.ox > 0) { box(-0.14, 0, 0.14, 7.4, PART, 0, c); box(-0.14, 8.8, 0.14, 0.2, PART, 0, c); }
-}
 function drawRoom(d, t) {
-  for (let i = 0; i < COLS; i++) for (let j = 0; j < ROWS; j++)
-    poly([iso(i, j), iso(i + 1, j), iso(i + 1, j + 1), iso(i, j + 1)], (i + j) % 2 ? P.floorA : P.floorB);
-  partitions(d);
+  drawPitShell(P.floorA, P.floorB);
+  windowOnBack(7.6, 9.4, t);
   d.branches.forEach(b => {
     const { x, y } = areaOf(b), [rA, rB] = b.col;
     poly([iso(x, y), iso(x + BAW, y), iso(x + BAW, y + BAH), iso(x, y + BAH)], rA);
@@ -792,7 +796,7 @@ function drawTelescope() {
   [iso(9.1, 0.8), iso(9.75, 0.95), iso(9.4, 1.35)].forEach(l => line(top, l, '#5b4330', 2.2));
   ctx.lineCap = 'round'; line(iso(9.2, 1.15, 25), iso(9.65, 0.6, 46), P.brass, 6); line(iso(9.6, 0.66, 44), iso(9.68, 0.56, 47), '#7a5a2a', 7); ctx.lineCap = 'butt';
 }
-function drawPlant(x = 10.3, y = 0.25) {
+function drawPlant(x = 9.7, y = 7.4) {
   box(x, y, 0.5, 0.5, 14, 0, B(P.pot));
   const c = iso(x + 0.25, y + 0.25, 14);
   [[-8, -8, 9], [7, -10, 8], [0, -18, 10], [-4, -26, 7], [6, -24, 6]].forEach(([dx, dy, r], i) => ell(c[0] + dx, c[1] + dy, r, r * 0.8, i % 2 ? P.leaf : tone(P.leaf, 0.8)));
@@ -845,8 +849,8 @@ function drawFoxBody(f, t) {
   let rows = SPR.front, flip = false, lift = 0, shake = 0;
   if (f.travel) { rows = step ? SPR.sideB : SPR.sideA; flip = f.dir < 0; }
   else if (f.state === 'working') {
-    if (f.act === 'task') { rows = SPR.sideA; flip = f.dir < 0; } else rows = SPR.back;
-    if (!reduceMotion && (f.act === 'type' || f.act === 'bash')) lift = (Math.floor(ph * 8) % 2) * p * 0.5;
+    if (f.act === 'task' || f.act === 'pong') { rows = SPR.sideA; flip = f.dir < 0; } else rows = SPR.back;
+    if (!reduceMotion && (f.act === 'type' || f.act === 'bash' || f.act === 'game' || f.act === 'pong')) lift = (Math.floor(ph * 8) % 2) * p * 0.5;
   }
   else if (f.state === 'celebrating') { rows = SPR.happy; lift = reduceMotion ? 0 : Math.abs(Math.sin(ph * 7)) * 14; }
   else if (f.state === 'stumble') shake = reduceMotion ? 0 : Math.sin(ph * 45) * 2.5;
@@ -863,19 +867,26 @@ function drawFoxBody(f, t) {
 }
 
 function statusOf(f) {
+  if (f.lounger && !f.entering) {
+    if (f.travel) return ['strolling', 'idle'];
+    if (f.cur?.k === 'hang') return [f.cur.h.label, f.state === 'sleeping' ? 'sleep' : 'idle'];
+  }
   if (f.state === 'sleeping') return ['asleep', 'sleep'];
   if (f.state === 'waiting') return ['needs you', 'wait'];
   if (f.state === 'celebrating') return ['quest done', 'done'];
   if (f.state === 'stumble') return ['tool error', 'err'];
   if (f.state === 'diving' || f.entering) return ['moving in', 'idle'];
-  if (f.state === 'working' && f.act === 'think') return ['thinking', 'busy'];
+  if (f.state === 'working' && f.act === 'think') return [`thinking${since(f.thinkSince)}`, 'busy'];
+  if (f.live && f.turnOpen && (f.cur?.k === 'pace' || (f.cur?.k === 'desk' && f.travel))) return [`thinking${since(f.thinkSince)}`, 'busy'];
   const c = f.cur;
-  if (c && c.k === 'tool') return [`${c.tool} ${short(c.target)}`, 'busy'];
+  if (c && c.k === 'tool') return [`${c.tool} ${short(c.target)}${since(c.startedAt)}`, 'busy'];
   if (c && c.k === 'prompt') return ['new quest', 'busy'];
   if (c && c.k === 'home') return ['heading home', 'idle'];
   if (f.travel) return ['walking', 'idle'];
   return ['idle', 'idle'];
 }
+// " · 12s" once something has run for a few seconds, so long steps visibly keep going
+const since = t0 => { if (t0 == null) return ''; const s = Math.floor(simT - t0); return s < 3 ? '' : s < 60 ? ` · ${s}s` : ` · ${Math.floor(s / 60)}m${String(s % 60).padStart(2, '0')}`; };
 const PILL = { busy: COL.ok, wait: COL.alert, done: COL.fox, err: COL.err, sleep: COL.muted, idle: COL.muted };
 const placed = [];
 function drawLabel(f) {
@@ -903,6 +914,7 @@ function drawParts(d) {
     if (p.kind === 'confetti') { ctx.save(); ctx.translate(p.x, p.y); ctx.rotate(p.rot); ctx.globalAlpha = a; ctx.fillStyle = p.color; ctx.fillRect(-2.5, -1.5, 5, 3); ctx.restore(); }
     else if (p.kind === 'smoke') { ctx.globalAlpha = a * 0.6; ell(p.x, p.y, p.r * (2 - a), p.r * (2 - a), '#bfb8ad'); }
     else if (p.kind === 'xp') { ctx.globalAlpha = Math.min(1, a * 1.6); ctx.fillStyle = COL.alert; ctx.font = `800 15px ${FONT}`; ctx.textAlign = 'center'; ctx.fillText(p.text, p.x, p.y); ctx.textAlign = 'left'; }
+    else if (p.kind === 'glyph') { ctx.globalAlpha = Math.min(1, a * 1.8); ctx.fillStyle = p.color; ctx.font = `600 ${p.size}px ${MONO}`; ctx.textAlign = 'center'; ctx.fillText(p.text, p.x, p.y); ctx.textAlign = 'left'; }
     else if (p.kind === 'z') { ctx.globalAlpha = a * 0.85; ctx.fillStyle = '#cfe3ff'; ctx.font = `600 ${11 + (1 - a) * 6}px ${FONT}`; ctx.fillText('z', p.x, p.y); }
     ctx.globalAlpha = 1;
   }
@@ -917,10 +929,10 @@ const ZOOM_STEP = 1.35, OVERVIEW_ZOOM_INS = 2;
 // "Whole floor" keeps the camera on the floor as rooms open and close, until you pan, zoom or visit a room
 let followFloor = true;
 function roomCenter(o) { return isoAbs(o.ox + 5.5, o.oy + 4.5, 30); }
-// the box around the basement and its lawn at the floor's current width; an empty lawn still frames one room
+// the box around the Commons and the open rooms, with some lawn around them
 function floorBounds() {
-  const w = Math.max(BW, ROOM_W);
-  const pts = [[-LAWN, -LAWN, WH], [w + LAWN, -LAWN, WH], [w + LAWN, 0, SOIL_DEPTH], [w, BH, SOIL_DEPTH], [-LAWN, BH, SOIL_DEPTH]].map(p => isoAbs(...p));
+  const pts = [COMMONS, ...openDens()].flatMap(({ ox, oy }) => [[ox - LAWN, oy - LAWN, WH], [ox + ROOM_W + LAWN, oy - LAWN, WH],
+    [ox + ROOM_W + LAWN, oy + BH, SOIL_DEPTH], [ox + ROOM_W, oy + BH + LAWN, SOIL_DEPTH], [ox - LAWN, oy + BH + LAWN, SOIL_DEPTH]]).map(p => isoAbs(...p));
   const xs = pts.map(p => p[0]), ys = pts.map(p => p[1]);
   return { x0: Math.min(...xs) - 30, x1: Math.max(...xs) + 30, y0: Math.min(...ys) - 60, y1: Math.max(...ys) + 30 };
 }
@@ -958,31 +970,23 @@ function focusRoom() {
   // the department the camera is centred on, once zoomed in enough to be "in" it
   if (cam.z < roomZ * 0.6) return null;
   let best = null, bd = Infinity;
-  openDens().forEach(o => { const [x, y] = roomCenter(o), dd = Math.hypot(x - cam.x, y - cam.y); if (dd < bd) { bd = dd; best = o; } });
+  [COMMONS, ...openDens()].forEach(o => { const [x, y] = roomCenter(o), dd = Math.hypot(x - cam.x, y - cam.y); if (dd < bd) { bd = dd; best = o; } });
   return bd < 360 ? best : null;
 }
 
 let signs = [];
-function drawQuietSign() {
-  const text = 'All quiet · a room opens when a session starts', [x, y] = toScreen(...isoAbs(ROOM_W / 2, BH / 2, 0));
-  ctx.font = `600 12px ${FONT}`;
-  const w = ctx.measureText(text).width + 28, h = 30;
-  ctx.fillStyle = 'rgba(14,21,19,.9)'; rrect(x - w / 2, y - h / 2, w, h, 8); ctx.fill();
-  ctx.strokeStyle = 'rgba(255,255,255,.12)'; ctx.lineWidth = 1; ctx.stroke();
-  ctx.fillStyle = COL.muted; ctx.fillText(text, x - w / 2 + 14, y + 0.5);
-}
 function drawSigns() {
   // department signs float above each room; branch tags sit at the front of their rugs and step aside so nothing overlaps
   signs = [];
   ctx.setTransform(scr.dpr, 0, 0, scr.dpr, 0, 0);
   ctx.textBaseline = 'middle';
-  const shown = openDens().filter(d => d.grow > 0.6);
-  if (!shown.length) return drawQuietSign();
+  const shown = [COMMONS, ...openDens().filter(d => d.grow > 0.6)];
   const depts = shown.map(o => {
     const [x, y] = toScreen(...isoAbs(o.ox + 5.5, o.oy + 0.2, 128));
     const need = o.foxes.filter(f => f.state === 'waiting').length;
     const awake = o.foxes.filter(f => !f.isCub && f.state !== 'sleeping').length;
-    const state = need ? `${need} needs you` : awake ? `${awake} awake` : 'all asleep';
+    const here = o.foxes.length;
+    const state = o.isCommons ? (here ? `${here} hanging out` : 'nobody here') : need ? `${need} needs you` : awake ? `${awake} awake` : 'all asleep';
     ctx.font = `600 13px ${MONO}`; const nw = ctx.measureText(o.name).width;
     ctx.font = `600 11px ${FONT}`; const sw = ctx.measureText(state).width;
     const w = nw + sw + 44, h = 28;
@@ -1017,40 +1021,41 @@ function render(t) {
   ctx.clearRect(0, 0, cv.width, cv.height);
   ctx.setTransform(scr.dpr * view.s, 0, 0, scr.dpr * view.s, scr.dpr * view.ox, scr.dpr * view.oy);
   ctx.lineCap = 'butt';
-  drawLawn();
-  drawShell(t);
-  const open = openDens();
-  open.forEach(d => drawDen(d, t)); // left to right is back to front along the back wall
+  drawGrounds(t);
+  const rooms = [COMMONS, ...openDens()].sort((a, b) => (a.ox + a.oy) - (b.ox + b.oy));
+  rooms.forEach(d => drawDen(d, t));
+  drawOutdoors(t);
   OFF = [0, 0];
   ctx.globalCompositeOperation = 'lighter';
-  const c = isoAbs(BW / 2, BH / 2, 40), g = ctx.createRadialGradient(c[0], c[1], 10, c[0], c[1], 700);
+  const c = isoAbs(COMMONS.ox + ROOM_W / 2, COMMONS.oy + BH / 2, 40), g = ctx.createRadialGradient(c[0], c[1], 10, c[0], c[1], 700);
   g.addColorStop(0, 'rgba(255,170,80,.08)'); g.addColorStop(1, 'rgba(255,170,80,0)');
   ctx.fillStyle = g; ctx.fillRect(c[0] - 700, c[1] - 700, 1400, 1400);
   ctx.globalCompositeOperation = 'source-over';
   if (view.s > roomZ * 0.55) {
     placed.length = 0;
-    open.filter(d => d.grow > 0.95).forEach(d => { OFF = [d.ox, d.oy]; [...d.foxes].sort((a, b) => (b.x + b.y) - (a.x + a.y)).forEach(drawLabel); });
+    rooms.filter(d => d.t >= 1).forEach(d => { OFF = [d.ox, d.oy]; [...d.foxes].sort((a, b) => (b.x + b.y) - (a.x + a.y)).forEach(drawLabel); });
   }
   OFF = [0, 0];
-  DENS.forEach(drawParts);
+  [COMMONS, ...DENS].forEach(drawParts);
   drawSigns();
 }
-const ROOM_DROP = 140; // how far above the floor a room's contents start when it opens
 function drawDen(d, t) {
   OFF = [d.ox, d.oy];
-  // while opening, the room's furniture and foxes drop into the widening basement and fade in; closing reverses it
-  const k = Math.min(1, d.grow);
+  if (d.t >= 1 && d.open) return drawDenContents(d, t);
+  // opening, the pit grows out of its centre at grass level with a little overshoot; closing shrinks it back
+  const [cx, cy] = isoAbs(d.ox + ROOM_W / 2, d.oy + BH / 2, WH), k = Math.max(0.001, d.grow);
   ctx.save();
-  ctx.globalAlpha = k;
-  ctx.translate(0, -(1 - k) * ROOM_DROP);
+  ctx.globalAlpha = Math.min(1, k);
+  ctx.translate(cx, cy); ctx.scale(k, k); ctx.translate(-cx, -cy);
   drawDenContents(d, t);
   ctx.restore();
 }
 function drawDenContents(d, t) {
+  if (d.isCommons) return drawCommons(d, t);
   drawRoom(d, t);
   const items = [];
   d.foxes.filter(f => !f.isCub).forEach(f => { const r = deskRect(f); items.push({ d: r.x + DW / 2 + r.y + DD / 2, fn: () => drawDesk(f, t) }); });
-  items.push({ d: 2.5, fn: () => drawBoard(d) }, { d: 4.3, fn: drawShelf }, { d: 6.6, fn: () => drawRack(d, t) }, { d: 10.0, fn: drawTelescope }, { d: 11.0, fn: () => drawPlant() });
+  items.push({ d: 2.5, fn: () => drawBoard(d) }, { d: 4.3, fn: drawShelf }, { d: 6.6, fn: () => drawRack(d, t) }, { d: 10.0, fn: drawTelescope }, { d: 17.4, fn: () => drawPlant() });
   d.foxes.forEach(f => items.push({ d: f.x + f.y, fn: () => drawFox(f, t) }));
   items.sort((a, b) => a.d - b.d).forEach(i => i.fn());
 }
@@ -1095,14 +1100,14 @@ function tap(px, py) {
   if (sign) { if (sign.b) visitBranch(sign.d, sign.b); else visit(sign.o); return; }
   const [wx, wy] = toWorld(px, py);
   let best = null, bd = 30;
-  openDens().forEach(d => d.foxes.forEach(f => { const [sx, sy] = wpos(f), dd = Math.hypot(wx - sx, wy - (sy - 16)); if (dd < bd) { bd = dd; best = f; } }));
+  [COMMONS, ...openDens()].forEach(d => d.foxes.forEach(f => { const [sx, sy] = wpos(f), dd = Math.hypot(wx - sx, wy - (sy - 16)); if (dd < bd) { bd = dd; best = f; } }));
   if (best) {
     best.hopAt = performance.now() / 1000;
-    select(best.parent || best); if (cam.z < roomZ * 0.6) visit(best.den); return;
+    select(best.of || best.parent || best); if (cam.z < roomZ * 0.6) visit(best.den); return;
   }
   if (cam.z < roomZ * 0.6) {
     // click anywhere on a department's floor to go there
-    const room = openDens().find(o => { const lx = (wx / (TW / 2) + wy / (TH / 2)) / 2 - o.ox, ly = (wy / (TH / 2) - wx / (TW / 2)) / 2 - o.oy; return lx >= 0 && lx <= COLS && ly >= 0 && ly <= ROWS; });
+    const room = [COMMONS, ...openDens()].find(o => { const lx = (wx / (TW / 2) + wy / (TH / 2)) / 2 - o.ox, ly = (wy / (TH / 2) - wx / (TW / 2)) / 2 - o.oy; return lx >= 0 && lx <= COLS && ly >= 0 && ly <= ROWS; });
     if (room) visit(room);
   }
 }
@@ -1233,7 +1238,9 @@ function renderDepts() {
     });
   });
   const where = $('where');
-  if (fr) {
+  if (fr && fr.isCommons) {
+    where.textContent = `You're in the Commons · ${fr.foxes.length} hanging out`;
+  } else if (fr) {
     where.textContent = `You're in ${fr.name} · ${fr.branches.length} branch${fr.branches.length > 1 ? 'es' : ''} · ${awakeOf(fr).length} awake`;
   } else {
     const open = DENS.filter(d => d.open);
@@ -1264,6 +1271,484 @@ $('go-den').addEventListener('click', () => { const f = waitingAll()[0]; if (f) 
   ['sp0', 'sp1', 'sp2', 'sp4'].forEach(o => $(o).setAttribute('aria-pressed', String(o === id)));
 }));
 $('hide-targets').addEventListener('change', e => { hideTargets = e.target.checked; if (jsonEv) showJson(jsonEv); lastTimelineKey = ''; renderUi(); });
+
+/* ---------- the Commons: the room in the middle where foxes hang out ----------
+   A few resident foxes always live here, and every fox whose room has closed comes over to join them:
+   pong, the bar, arcade and console games, the couch, a nap or a dance. */
+const COMMONS = Object.assign(makeDen('Commons', 0), { id: 'commons', isCommons: true, open: true, t: 1, grow: 1, rug: ['#2f4f55', '#3c6168'] });
+COMMONS.blocked = new Set(['1,0', '2,0', '3,0', '4,0', '0,3', '1,3', '0,4', '1,4', '0,5', '1,5', '0,6', '0,7',
+  '6,3', '7,3', '8,3', '6,4', '7,4', '8,4', '3,6', '4,6', '5,6', '3,7', '4,7', '5,7', '9,6']);
+const STOOL_Z = 10, COUCH_Z = 8, TABLE_Z = 14;
+const PONG_Y = 4.3, PONG_X0 = 5.45, PONG_X1 = 9.0;
+const HANGOUTS = [
+  { x: 2.0, y: 1.45, z: STOOL_Z, face: 1, state: 'working', act: 'drink', label: 'at the bar' },
+  { x: 3.0, y: 1.45, z: STOOL_Z, face: -1, state: 'working', act: 'drink', label: 'at the bar' },
+  { x: 4.0, y: 1.45, z: STOOL_Z, face: -1, state: 'working', act: 'drink', label: 'at the bar' },
+  { x: 2.1, y: 4.0, face: -1, state: 'working', act: 'game', label: 'playing arcade' },
+  { x: 2.1, y: 5.05, face: -1, state: 'working', act: 'game', label: 'playing arcade' },
+  { x: 1.7, y: 6.45, face: -1, state: 'working', act: 'game', label: 'playing video games' },
+  { x: 1.7, y: 7.3, face: -1, state: 'working', act: 'game', label: 'playing video games' },
+  { x: PONG_X0, y: PONG_Y, face: 1, state: 'working', act: 'pong', label: 'playing pong', pong: 0 },
+  { x: PONG_X1, y: PONG_Y, face: -1, state: 'working', act: 'pong', label: 'playing pong', pong: 1 },
+  { x: 4.0, y: 7.2, z: COUCH_Z, face: 1, state: 'idle', label: 'on the couch' },
+  { x: 5.2, y: 7.2, z: COUCH_Z, face: -1, state: 'idle', label: 'on the couch' },
+  { x: 8.6, y: 1.4, face: 1, state: 'working', act: 'gaze', label: 'looking outside' },
+  { x: 8.8, y: 7.6, face: 1, state: 'sleeping', label: 'napping' },
+  { x: 7.0, y: 6.5, face: 1, state: 'celebrating', label: 'dancing' },
+  { x: 7.8, y: 6.9, face: -1, state: 'celebrating', label: 'dancing' },
+];
+const RESIDENTS = [{ name: 'Bramble', fur: '#d9822f' }, { name: 'Thistle', fur: '#c96a33' }, { name: 'Nettle', fur: '#e39a52' }, { name: 'Wren', fur: '#dfe7ec', arctic: true }];
+const MAX_LOUNGERS = HANGOUTS.length - RESIDENTS.length;
+const pongSpot = side => HANGOUTS.find(h => h.pong === side);
+
+function makeLounger(o) {
+  return makeFox({ source: 'resident', model: 'off duty', branch: 'commons', lounger: true, ...o }, COMMONS);
+}
+// residents start mid-game: a pong match, the bar and the arcade
+RESIDENTS.forEach((r, i) => {
+  const f = makeLounger({ ...r, resident: true }), h = HANGOUTS[[7, 8, 0, 3][i]];
+  Object.assign(f, { x: h.x, y: h.y, z: h.z || 0, dir: h.face, spot: h, cur: { k: 'hang', h }, state: h.state, act: h.act || null, timer: rnd(6, 16) });
+  COMMONS.foxes.push(f);
+});
+
+function loungerTick(f, dt) {
+  if (f.timer > 0) { f.timer -= dt; return; }
+  pickHangout(f);
+}
+function pickHangout(f) {
+  const taken = new Set(COMMONS.foxes.filter(o => o !== f && o.spot).map(o => o.spot));
+  const free = HANGOUTS.filter(h => !taken.has(h) && h !== f.spot);
+  // a fox waiting at the pong table usually gets a partner
+  const partner = free.find(h => h.pong != null && taken.has(pongSpot(1 - h.pong)));
+  const h = partner && R() < 0.6 ? partner : free[Math.floor(R() * free.length)];
+  f.z = 0;
+  if (!h) { f.spot = null; f.cur = { k: 'wander' }; goTo(f, rugSpot()); return; }
+  f.spot = h; f.cur = { k: 'hang', h };
+  goTo(f, { x: h.x, y: h.y, face: h.face, st: 'hang' });
+}
+// every fox whose room is closed (or still waiting for a free slot) hangs out here; when its room opens it heads back
+function syncLoungers() {
+  const away = d => !roomShown(d) && (!d.open || d.slot == null);
+  const wanted = DENS.flatMap(d => away(d) ? d.foxes.filter(f => !f.isCub && !f.entering) : [])
+    .sort((a, b) => (b.lastAt || 0) - (a.lastAt || 0)).slice(0, MAX_LOUNGERS);
+  const want = new Set(wanted);
+  for (const l of COMMONS.foxes.filter(o => o.of && !want.has(o.of))) {
+    burst(l, 'smoke', 8);
+    COMMONS.foxes = COMMONS.foxes.filter(o => o !== l);
+    if (selected === l) select(l.of);
+  }
+  const here = new Set(COMMONS.foxes.map(o => o.of));
+  for (const f of wanted) {
+    if (here.has(f)) continue;
+    const l = makeLounger({ name: f.name, fur: f.fur, arctic: f.arctic, of: f });
+    COMMONS.foxes.push(l);
+    enterViaHoles(l, null);
+  }
+}
+
+const NEON = ['#f3a0c4', '#ff7eb6'];
+const BOTTLES = ['#7fd3a0', '#c2563f', '#d9a441', '#8fc4ff', '#e2d3b5', '#9b6ad1', '#d9a441'];
+const SCREEN_COLS = ['#7fd3a0', '#8fc4ff', '#ffd77e', '#f3a0c4'];
+const playing = h => COMMONS.foxes.some(f => f.spot === h && !f.travel && f.state === h.state);
+function drawBar(t) {
+  box(1.7, 0.02, 2.6, 0.14, 4, 44, B('#5e4330'));
+  BOTTLES.forEach((c, k) => { const p = iso(1.85 + k * 0.36, 0.1, 48); ctx.fillStyle = c; ctx.fillRect(p[0] - 2, p[1] - 10, 4, 10); ctx.fillRect(p[0] - 1, p[1] - 13, 2, 3); });
+  const sign = iso(3.0, 0.02, 74);
+  ctx.font = `800 13px ${FONT}`; ctx.textAlign = 'center';
+  ctx.fillStyle = NEON[Math.floor(t * 1.3) % 7 ? 0 : 1]; ctx.fillText('BAR', sign[0], sign[1]); ctx.textAlign = 'left';
+  box(1.6, 0.3, 2.8, 0.7, 22, 0, B('#6b4a30'));
+  HANGOUTS.filter(h => h.act === 'drink').forEach(h => {
+    if (!playing(h)) return;
+    const m = iso(h.x, 0.85, 22); ctx.fillStyle = '#f1e4c6'; ctx.fillRect(m[0] - 3, m[1] - 7, 6, 7); ctx.fillStyle = '#ffd77e'; ctx.fillRect(m[0] - 2, m[1] - 6, 4, 2);
+  });
+}
+function drawStool(h) { box(h.x - 0.16, h.y - 0.16, 0.32, 0.32, STOOL_Z, 0, B('#8a6240')); }
+function drawArcade(y0, t) {
+  box(0.35, y0, 0.7, 0.85, 46, 0, B('#5d3a6e'));
+  const on = playing(HANGOUTS.find(h => h.act === 'game' && Math.abs(h.y - (y0 + 0.4)) < 0.2));
+  const c = on ? SCREEN_COLS[Math.floor(t * 4 + y0) % 4] : '#2a3440';
+  poly([iso(1.06, y0 + 0.12, 26), iso(1.06, y0 + 0.73, 26), iso(1.06, y0 + 0.73, 40), iso(1.06, y0 + 0.12, 40)], c);
+  poly([iso(1.06, y0 + 0.05, 42), iso(1.06, y0 + 0.8, 42), iso(1.06, y0 + 0.8, 46), iso(1.06, y0 + 0.05, 46)], NEON[0]);
+}
+function drawTv(t) {
+  box(0.3, 6.1, 0.55, 1.3, 14, 0, B('#5e4330'));
+  box(0.35, 6.15, 0.12, 1.2, 20, 16, B('#1d2226'));
+  const on = HANGOUTS.some(h => h.label === 'playing video games' && playing(h));
+  poly([iso(0.48, 6.22, 18), iso(0.48, 7.28, 18), iso(0.48, 7.28, 34), iso(0.48, 6.22, 34)], on ? '#20324a' : '#14191d');
+  if (!on) return;
+  // two little racers on the screen
+  for (let k = 0; k < 2; k++) {
+    const u = (t * (0.35 + k * 0.12) + k * 0.4) % 1, y = 6.3 + u * 0.9, z = 22 + k * 6;
+    poly([iso(0.485, y, z), iso(0.485, y + 0.08, z), iso(0.485, y + 0.08, z + 3), iso(0.485, y, z + 3)], SCREEN_COLS[k + 1]);
+  }
+  box(0.55, 6.5, 0.2, 0.3, 3, 14, B('#2b2b2b')); // the console
+}
+function drawPongTable(t) {
+  box(6.0, 3.6, 2.4, 1.4, TABLE_Z, 0, B('#2f6b4f'));
+  line(iso(6.0, PONG_Y, TABLE_Z + 0.2), iso(8.4, PONG_Y, TABLE_Z + 0.2), '#e8e0d0', 1);
+  poly([iso(7.2, 3.6, TABLE_Z), iso(7.2, 5.0, TABLE_Z), iso(7.2, 5.0, TABLE_Z + 6), iso(7.2, 3.6, TABLE_Z + 6)], 'rgba(230,230,230,.65)');
+  if (!playing(pongSpot(0)) || !playing(pongSpot(1))) return;
+  // the ball: high at each paddle and over the net, bouncing once on each half
+  const u = (t * 0.9) % 2, s = u < 1 ? u : 2 - u, bx = PONG_X0 + 0.5 + s * (PONG_X1 - PONG_X0 - 1), by = PONG_Y + 0.25 * Math.sin(t * 1.3);
+  const bz = TABLE_Z + 2 + 18 * Math.abs(Math.cos(2 * Math.PI * s)), sh = iso(bx, by, TABLE_Z), b = iso(bx, by, bz);
+  ell(sh[0], sh[1], 3, 1.4, 'rgba(0,0,0,.3)'); ell(b[0], b[1], 2.8, 2.8, '#fbf7ee');
+}
+function drawCouch() {
+  box(3.4, 6.6, 2.4, 0.8, COUCH_Z, 0, B(P.couch));
+  box(3.4, 6.6, 2.4, 0.22, 24, 0, B(P.couch));
+  box(3.4, 6.6, 0.22, 0.8, 16, 0, B(P.couch)); box(5.58, 6.6, 0.22, 0.8, 16, 0, B(P.couch));
+}
+function drawCommons(d, t) {
+  drawPitShell(P.lobby, P.lobbyB);
+  windowOnBack(7.6, 9.4, t);
+  drawWallHole();
+  poly([iso(4.8, 2.9), iso(10.0, 2.9), iso(10.0, 5.8), iso(4.8, 5.8)], d.rug[0]);
+  poly([iso(5.0, 3.1), iso(9.8, 3.1), iso(9.8, 5.6), iso(5.0, 5.6)], d.rug[1]);
+  // dance floor: tiles take turns lighting up
+  for (let i = 0; i < 4; i++) for (let j = 0; j < 3; j++) {
+    const x = 6.3 + i * 0.5, y = 6.0 + j * 0.5, c = SCREEN_COLS[(i + j + Math.floor(t * 2)) % 4];
+    ctx.globalAlpha = 0.45; poly([iso(x, y), iso(x + 0.46, y), iso(x + 0.46, y + 0.46), iso(x, y + 0.46)], c); ctx.globalAlpha = 1;
+  }
+  [[1.7, 6.45, '#8b5aa8'], [1.7, 7.3, '#4f78a6'], [8.8, 7.6, P.cush]].forEach(([x, y, c]) => { const p = iso(x, y); ell(p[0], p[1] + 2, 24, 11, c); });
+  const items = [
+    { d: 2.0, fn: () => drawBar(t) },
+    { d: 4.4, fn: () => drawArcade(3.6, t) }, { d: 5.4, fn: () => drawArcade(4.6, t) },
+    { d: 7.0, fn: () => drawTv(t) },
+    { d: 11.5, fn: () => drawPongTable(t) },
+    { d: 11.0, fn: drawCouch },
+    { d: 15.9, fn: () => drawPlant(9.6, 6.0) },
+  ];
+  HANGOUTS.filter(h => h.act === 'drink').forEach(h => items.push({ d: h.x + h.y - 0.05, fn: () => drawStool(h) }));
+  d.foxes.forEach(f => items.push({ d: f.x + f.y, fn: () => drawFox(f, t) }));
+  items.sort((a, b) => a.d - b.d).forEach(i => i.fn());
+}
+
+/* ---------- busy foxes: what a fox is doing drifts up off it as little glyphs ---------- */
+const GLYPHS = {
+  think: { chars: ['?', '…', '*', '~', '!?'], color: '#cfe3ff' },
+  type: { chars: ['{ }', ';', '</>', '=>', '()', '+1'], color: '#9be6ff' },
+  read: { chars: ['¶', '#', 'Aa', '§'], color: '#f1e4c6' },
+  bash: { chars: ['$', '>_', '&&', 'ok'], color: '#6ff0a0' },
+  gaze: { chars: ['www', '@', '?'], color: '#8fc4ff' },
+  task: { chars: ['+', '>>', 'go'], color: '#ffd77e' },
+  game: { chars: ['★', '+10', '♪', 'GG'], color: '#f3a0c4' },
+  pong: { chars: ['pok', '+1'], color: '#fbf7ee' },
+  drink: { chars: ['♪', 'cheers', '♥'], color: '#ffb38a' },
+};
+function emitGlyph(d, f, dt) {
+  f.glyphT = (f.glyphT ?? 0) - dt;
+  if (f.glyphT > 0) return;
+  const act = f.state === 'working' ? f.act : 'think', g = GLYPHS[act];
+  f.glyphT = act === 'think' ? rnd(0.7, 1.2) : rnd(0.35, 0.7);
+  if (!g || (d !== COMMONS && !roomShown(d))) return;
+  const [sx, sy] = wpos(f);
+  d.parts.push({ kind: 'glyph', text: g.chars[Math.floor(R() * g.chars.length)], color: g.color, size: rnd(10, 13),
+    x: sx + rnd(-10, 10), y: sy - 46, vx: rnd(-8, 8), vy: rnd(-26, -18), life: 1.6, max: 1.6 });
+}
+const PACE_EVERY = [5, 9];
+// a thinking fox gets up every few seconds, takes a few steps away from its desk, pauses, and comes back
+function pace(f, dt) {
+  f.paceT = (f.paceT || 0) + dt;
+  if (f.paceT < (f.paceAt ??= rnd(...PACE_EVERY))) return;
+  f.paceT = 0; f.paceAt = rnd(...PACE_EVERY);
+  const desk = spotFor(f, 'desk');
+  f.cur = { k: 'pace' };
+  goTo(f, { x: desk.x + rnd(-0.9, 0.9), y: desk.y + rnd(0.5, 1.1), face: R() < 0.5 ? 1 : -1, st: 'pace' });
+}
+
+/* ---------- the grounds: lawn to every edge of the screen, a river, trees, flowers and wildlife ----------
+   Nothing outdoors goes on the lawn in front of a room (its floor hangs over that strip on screen),
+   so trees and animals never hide a fox. */
+const SLOT_ORIGINS = [[0, 0], ...RING].map(([i, j]) => [i * CELL_W, j * CELL_H]);
+const WORLD = { x0: -CELL_W - 16, x1: CELL_W + ROOM_W + 16, y0: -CELL_H - 16, y1: CELL_H + BH + 16 };
+const RIVER_X = CELL_W - 2.1, RIVER_HW = 0.85, BRIDGE_Y = BH + 5;
+const riverX = y => RIVER_X + 0.5 * Math.sin(y / 3.1) + 0.25 * Math.sin(y / 1.7 + 1);
+const inRiver = (x, y, pad = 0) => Math.abs(x - riverX(y)) < RIVER_HW + pad;
+// the lawn a room needs clear: its rim, the strip its floor hangs over on screen, and the path to its grass hole
+function nearRoom(ox, oy, x, y, pad) {
+  if (x > ox - pad && x < ox + ROOM_W + CUTAWAY + pad && y > oy - pad && y < oy + BH + CUTAWAY + pad) return true;
+  return x > ox + HOLE_X - 2 - pad && x < ox + HOLE_X + 4.5 + pad && y > oy + GRASS_HOLE_Y - 2 - pad && y < oy;
+}
+const clearOfAllRooms = (x, y, pad) => !SLOT_ORIGINS.some(([ox, oy]) => nearRoom(ox, oy, x, y, pad));
+const clearOfOpenRooms = (x, y, pad) => ![COMMONS, ...openDens()].some(d => nearRoom(d.ox, d.oy, x, y, pad));
+const onLand = (x, y, pad = 0.5) => x > WORLD.x0 && x < WORLD.x1 && y > WORLD.y0 && y < WORLD.y1
+  && !inRiver(x, y, pad + 0.4) && clearOfOpenRooms(x, y, pad);
+
+function seeded(n) { let s = n; return () => (s = (s * 16807) % 2147483647) / 2147483647; }
+const rng = seeded(1234);
+// fixed scenery, placed once: clear of every slot (any of them may open) and of the river and bridge
+function scatter(n, pad) {
+  const out = [];
+  for (let k = 0; k < n * 6 && out.length < n; k++) {
+    const x = WORLD.x0 + rng() * (WORLD.x1 - WORLD.x0), y = WORLD.y0 + rng() * (WORLD.y1 - WORLD.y0);
+    if (clearOfAllRooms(x, y, pad) && !inRiver(x, y, pad + 0.6) && Math.hypot(x - riverX(BRIDGE_Y), y - BRIDGE_Y) > 3) out.push({ x, y, r: rng() });
+  }
+  return out;
+}
+const TREES = scatter(44, 2.5).map(tr => ({ ...tr, pine: tr.r < 0.45 }));
+const BUSHES = scatter(30, 1);
+const FLOWERS = scatter(170, 0.3);
+const ROCKS = scatter(24, 0.6);
+const FLOWER_COLS = ['#f3a0c4', '#ffd77e', '#f1e9dc', '#8fc4ff', '#c9a0f3'];
+
+// the tile range on screen at grass height, padded; the lawn is drawn across all of it
+function visibleTiles(pad) {
+  const pts = [[0, 0], [scr.w, 0], [0, scr.h], [scr.w, scr.h]].map(([px, py]) => {
+    const [wx, wy] = toWorld(px, py), u = wx / (TW / 2), v = (wy + WH) / (TH / 2);
+    return [(u + v) / 2, (v - u) / 2];
+  });
+  const xs = pts.map(p => p[0]), ys = pts.map(p => p[1]);
+  return { x0: Math.min(...xs) - pad, x1: Math.max(...xs) + pad, y0: Math.min(...ys) - pad, y1: Math.max(...ys) + pad };
+}
+const inView = (v, x, y) => x > v.x0 && x < v.x1 && y > v.y0 && y < v.y1;
+function drawGrounds(t) {
+  OFF = [0, 0];
+  const v = visibleTiles(2);
+  poly([iso(v.x0, v.y0, WH), iso(v.x1, v.y0, WH), iso(v.x1, v.y1, WH), iso(v.x0, v.y1, WH)], P.grassB);
+  for (let j = Math.floor(v.y0 / 2) * 2; j < v.y1; j += 2) poly([iso(v.x0, j, WH), iso(v.x1, j, WH), iso(v.x1, j + 1, WH), iso(v.x0, j + 1, WH)], P.grassA);
+  if (view.s > 0.3) {
+    for (let i = Math.floor(v.x0 / 2); i < v.x1 / 2; i++) for (let j = Math.floor(v.y0 / 2); j < v.y1 / 2; j++) {
+      const r = ((i * 73856093) ^ (j * 19349663)) >>> 0;
+      if (r % 4) continue;
+      const u = i * 2 + (r % 13) / 7, w = j * 2 + (r % 11) / 6;
+      [-0.08, 0, 0.08].forEach((dd, k) => line(iso(u + dd, w, WH), iso(u + dd * 1.6, w - 0.05, WH + 6 + (k % 2) * 3), P.blade, 1.4));
+    }
+  }
+  drawRiver(t, v);
+  ROCKS.forEach(rk => { if (inView(v, rk.x, rk.y)) drawRock(rk); });
+  FLOWERS.forEach(fl => { if (inView(v, fl.x, fl.y)) drawFlower(fl); });
+}
+function drawRiver(t, v) {
+  if (RIVER_X < v.x0 - 3 || RIVER_X > v.x1 + 3) return;
+  const ys = [];
+  for (let y = v.y0; y <= v.y1 + 0.5; y += 0.5) ys.push(y);
+  const band = (w, z) => [...ys.map(y => iso(riverX(y) - w, y, z)), ...ys.slice().reverse().map(y => iso(riverX(y) + w, y, z))];
+  poly(band(RIVER_HW + 0.35, WH), P.bank);
+  poly(band(RIVER_HW, WH - 3), P.water);
+  for (let y = Math.floor(v.y0); y < v.y1; y += 1.1) {
+    const yy = y + (t * 0.7) % 1.1, x = riverX(yy) + Math.sin(yy * 2.3) * 0.45;
+    line(iso(x - 0.22, yy, WH - 2), iso(x + 0.22, yy, WH - 2), P.ripple, 1.4);
+  }
+}
+function drawFlower(fl) {
+  const c = iso(fl.x, fl.y, WH);
+  for (let k = 0; k < 3; k++) {
+    const dx = (k - 1) * 4, dy = (k % 2) * 2;
+    ctx.fillStyle = P.blade; ctx.fillRect(c[0] + dx, c[1] + dy - 4, 1, 4);
+    ctx.fillStyle = FLOWER_COLS[Math.floor(fl.r * 5 + k) % 5]; ctx.fillRect(c[0] + dx - 1.5, c[1] + dy - 6.5, 3, 3);
+  }
+}
+function drawRock(rk) {
+  const c = iso(rk.x, rk.y, WH), s = 5 + rk.r * 6;
+  ell(c[0], c[1] + 1, s * 1.2, s * 0.55, 'rgba(0,0,0,.25)');
+  ell(c[0], c[1] - s * 0.3, s, s * 0.6, '#6b6f6a'); ell(c[0] - s * 0.3, c[1] - s * 0.5, s * 0.4, s * 0.22, '#8a8f88');
+}
+function drawTree(tr, t) {
+  const [sx, sy] = iso(tr.x, tr.y, WH), s = 0.8 + tr.r * 0.5, sway = Math.sin(t * 0.7 + tr.r * 9) * 1.2 * s;
+  ell(sx + 6 * s, sy + 2, 20 * s, 7 * s, 'rgba(0,0,0,.25)');
+  ctx.fillStyle = '#5b3d26'; ctx.fillRect(sx - 3 * s, sy - 20 * s, 6 * s, 20 * s);
+  if (tr.pine) {
+    [['#24472f', 18, 22], ['#2b5537', 34, 17], ['#336140', 48, 11]].forEach(([c, base, w]) => {
+      ctx.fillStyle = c; ctx.beginPath();
+      ctx.moveTo(sx - w * s, sy - base * s); ctx.lineTo(sx + w * s, sy - base * s); ctx.lineTo(sx + sway, sy - (base + 26) * s);
+      ctx.closePath(); ctx.fill();
+    });
+  } else {
+    [[0, 36, 20, '#2e5a34'], [-11, 30, 13, '#2a5230'], [11, 31, 14, '#33633a'], [2, 46, 14, '#3a6d40']]
+      .forEach(([dx, h, r, c]) => ell(sx + dx * s + sway, sy - h * s, r * s, r * 0.85 * s, c));
+  }
+}
+function drawBush(b) {
+  const [sx, sy] = iso(b.x, b.y, WH), s = 0.7 + b.r * 0.5;
+  ell(sx, sy + 1, 14 * s, 5 * s, 'rgba(0,0,0,.22)');
+  [[-6, 7, 8], [6, 7, 8], [0, 11, 9]].forEach(([dx, h, r], i) => ell(sx + dx * s, sy - h * s, r * s, r * 0.8 * s, i === 2 ? '#3a6d40' : '#2e5a34'));
+  if (b.r > 0.5) [[-5, 10], [4, 13], [1, 7]].forEach(([dx, h]) => { ctx.fillStyle = '#e0605a'; ctx.fillRect(sx + dx * s, sy - h * s, 2, 2); });
+}
+function drawBridge() {
+  const cx = riverX(BRIDGE_Y), x0 = cx - 1.7, x1 = cx + 1.7, y0 = BRIDGE_Y - 0.5, y1 = BRIDGE_Y + 0.5, n = 10;
+  const zAt = k => WH + 2 + 7 * Math.sin(Math.PI * k / n);
+  for (let k = 0; k < n; k++) {
+    const a = x0 + (x1 - x0) * k / n, b = a + (x1 - x0) / n - 0.03, z = zAt(k + 0.5);
+    poly([iso(a, y0, z), iso(b, y0, z), iso(b, y1, z), iso(a, y1, z)], k % 2 ? '#8a6240' : '#7b5536');
+  }
+  [y0, y1].forEach(y => {
+    for (let k = 0; k <= n; k += 2) { const x = x0 + (x1 - x0) * k / n; line(iso(x, y, zAt(k)), iso(x, y, zAt(k) + 9), '#5e4330', 2); }
+    for (let k = 0; k < n; k++) line(iso(x0 + (x1 - x0) * k / n, y, zAt(k) + 9), iso(x0 + (x1 - x0) * (k + 1) / n, y, zAt(k + 1) + 9), '#6b4a30', 2);
+  });
+}
+
+/* ---------- wildlife: birds, squirrels, deer, ducks and butterflies ---------- */
+const BIRD = {
+  stand: norm(['...oo..', '..okoy.', 'oooccc.', '.ddcc..', '..k.k..']),
+  peck: norm(['.......', '.ooo...', 'odddoo.', '..ccoky', '..k.k..']),
+  flyA: norm(['d.....d', 'dd...dd', '.ddodd.', '..oco..', '.......']),
+  flyB: norm(['.......', '..ooo..', 'ddoccdd', 'd.....d', '.......']),
+};
+const BIRD_PALS = [{ o: '#7a5a44', c: '#e3793e', d: '#5e4535', k: INK, y: '#f2c14e' },
+  { o: '#4f7fb8', c: '#e8b38a', d: '#3c628f', k: INK, y: '#f2c14e' }, { o: '#8b7a64', c: '#d9c9a8', d: '#6b5c48', k: INK, y: '#e0b050' }];
+const SQUIRREL = {
+  runA: norm(['tt.......', 'ttt...oo.', '.tt.oooko', '..ooocco.', '..k...k..']),
+  runB: norm(['.tt......', 'ttt...oo.', 'tt.ooooko', '..ooocc..', '...k.k...']),
+  sit: norm(['tt....oo.', 'ttt..ooko', '.tt.occo.', '..ttoccc.', '....kk...']),
+};
+const SQ_PAL = { t: '#b86a35', o: '#a0582c', c: '#e8c99a', k: INK };
+const DEER = {
+  stand: norm(['...........e.e', '...........ooo', '..........ookoo', '...........oc', '.ooooooooooo', 'ooooooooooo', 'occcccccooo', '.o.o.....o.o', '.o.o.....o.o', '.k.k.....k.k']),
+  graze: norm(['', '', '', '', '.oooooooooo', 'ooooooooooooo', 'occcccccoooooo', '.o.o.....o.eoo', '.o.o.....o.okoo', '.k.k.....k..cc']),
+};
+const DEER_PAL = { o: '#8a5a34', c: '#e9d6b0', k: INK, e: '#6b4426' };
+const DUCK = norm(['.....gg..', '....gkgyy', 'oowwoooo.', '.oooooo..']);
+const DUCK_PAL = { g: '#2f6b45', o: '#c9b38a', w: '#8a7a5c', y: '#e9a03b', k: INK };
+const BUTTERFLY_COLS = ['#f3a0c4', '#ffd77e', '#8fc4ff', '#f1e9dc'];
+
+const critters = [], flocks = [];
+function landSpot(near, radius, pad = 0.6) {
+  for (let k = 0; k < 40; k++) {
+    const x = near ? near.x + (R() * 2 - 1) * radius : rnd(WORLD.x0, WORLD.x1);
+    const y = near ? near.y + (R() * 2 - 1) * radius : rnd(WORLD.y0, WORLD.y1);
+    if (onLand(x, y, pad)) return { x, y };
+  }
+  return null;
+}
+function spawnWildlife() {
+  for (let n = 0; n < 3; n++) {
+    const home = landSpot(null); if (!home) continue;
+    const flock = { ...home, timer: rnd(8, 16), birds: [] };
+    for (let k = 0; k < 4; k++) {
+      const b = { kind: 'bird', flock, pal: BIRD_PALS[n % 3], x: home.x + rnd(-0.8, 0.8), y: home.y + rnd(-0.8, 0.8), z: WH, state: 'peck', timer: rnd(0.3, 2), dir: R() < 0.5 ? 1 : -1, phase: R() * 10 };
+      flock.birds.push(b); critters.push(b);
+    }
+    flocks.push(flock);
+  }
+  TREES.filter(tr => !tr.pine).slice(0, 3).forEach(tr => {
+    const a = { kind: 'squirrel', x: tr.x + 1, y: tr.y + 0.5, z: WH, home: tr, state: 'sit', timer: rnd(0.5, 2), dir: 1, hop: 0, phase: R() * 10, lead: true };
+    const b = { ...a, x: a.x + 1, lead: false, phase: R() * 10 };
+    a.mate = b; b.mate = a; critters.push(a, b);
+  });
+  for (let k = 0; k < 3; k++) { const s = landSpot(null, 0, 1.2); if (s) critters.push({ kind: 'deer', ...s, z: WH, state: 'graze', timer: rnd(3, 8), dir: R() < 0.5 ? 1 : -1, phase: R() * 10 }); }
+  for (let k = 0; k < 3; k++) {
+    const y = rnd(WORLD.y0 + 5, WORLD.y1 - 5), off = rnd(-0.4, 0.4);
+    critters.push({ kind: 'duck', x: riverX(y) + off, y, off, z: WH - 3, dirY: R() < 0.5 ? 1 : -1, dir: 1, phase: R() * 10 });
+  }
+  FLOWERS.slice(0, 6).forEach(fl => critters.push({ kind: 'butterfly', x: fl.x, y: fl.y, z: WH + 14, tx: fl.x, ty: fl.y, col: BUTTERFLY_COLS[Math.floor(fl.r * 4)], dir: 1, phase: R() * 10 }));
+}
+spawnWildlife();
+
+function stepToward(c, tx, ty, speed, dt) {
+  const dx = tx - c.x, dy = ty - c.y, dist = Math.hypot(dx, dy);
+  if (Math.abs(dx - dy) > 0.01) c.dir = dx - dy > 0 ? 1 : -1;
+  if (dist <= speed * dt) { c.x = tx; c.y = ty; return true; }
+  c.x += dx / dist * speed * dt; c.y += dy / dist * speed * dt;
+  return false;
+}
+// a flock pecks around one spot, then takes off together; a room opening under it scares it off early
+function tickFlock(fl, dt) {
+  fl.timer -= dt;
+  const spooked = fl.birds.some(b => b.state !== 'fly' && !onLand(b.x, b.y, 0.2));
+  if (fl.timer > 0 && !spooked) return;
+  const home = landSpot(null) || fl;
+  Object.assign(fl, { x: home.x, y: home.y, timer: rnd(10, 20) });
+  fl.birds.forEach(b => Object.assign(b, { state: 'fly', sx: b.x, sy: b.y, tx: home.x + rnd(-0.8, 0.8), ty: home.y + rnd(-0.8, 0.8) }));
+}
+const TICK = {
+  bird(b, dt) {
+    if (b.state === 'fly') {
+      const total = Math.hypot(b.tx - b.sx, b.ty - b.sy) || 1, done = stepToward(b, b.tx, b.ty, 6, dt);
+      b.z = WH + 6 + Math.sin(Math.PI * (1 - Math.hypot(b.tx - b.x, b.ty - b.y) / total)) * 60;
+      if (done) Object.assign(b, { state: 'peck', z: WH, timer: rnd(0.4, 1.5) });
+      return;
+    }
+    if (b.state === 'hop') {
+      if (stepToward(b, b.tx, b.ty, 1.6, dt)) Object.assign(b, { state: 'peck', z: WH, timer: rnd(0.5, 2.2) });
+      else b.z = WH + Math.abs(Math.sin((simT + b.phase) * 12)) * 4;
+      return;
+    }
+    if ((b.timer -= dt) > 0) return;
+    const fl = b.flock;
+    Object.assign(b, { state: 'hop', tx: fl.x + rnd(-0.9, 0.9), ty: fl.y + rnd(-0.9, 0.9) });
+  },
+  // two squirrels play tag: one dashes about near its tree, the other chases; on a catch they swap
+  squirrel(s, dt) {
+    if (s.hop > 0) s.hop -= dt;
+    if (s.lead) {
+      if (s.state === 'run') { if (stepToward(s, s.tx, s.ty, 4.6, dt)) Object.assign(s, { state: 'sit', timer: rnd(0.3, 1.4) }); }
+      else if ((s.timer -= dt) <= 0) { const p = landSpot(s.home, 4, 0.3) || s.home; Object.assign(s, { state: 'run', tx: p.x, ty: p.y }); }
+    } else {
+      const m = s.mate;
+      if (Math.hypot(m.x - s.x, m.y - s.y) > 0.45) { s.state = 'run'; stepToward(s, m.x, m.y, 4.2, dt); }
+      else if (m.state === 'sit') { s.state = 'sit'; s.lead = true; m.lead = false; s.timer = rnd(0.2, 0.8); s.hop = m.hop = 0.35; }
+    }
+    s.z = WH + (s.state === 'run' ? Math.abs(Math.sin((simT + s.phase) * 14)) * 3 : 0) + (s.hop > 0 ? Math.sin(s.hop / 0.35 * Math.PI) * 8 : 0);
+  },
+  deer(d, dt) {
+    if (d.state !== 'walk' && !onLand(d.x, d.y, 0.8)) { const p = landSpot(d, 10, 1.2); if (p) Object.assign(d, { state: 'walk', tx: p.x, ty: p.y, speed: 2.2 }); }
+    if (d.state === 'walk') { if (stepToward(d, d.tx, d.ty, d.speed, dt)) Object.assign(d, { state: 'graze', timer: rnd(4, 9) }); return; }
+    if ((d.timer -= dt) > 0) return;
+    if (d.state === 'graze') { Object.assign(d, { state: 'look', timer: rnd(1.5, 3.5) }); return; }
+    const p = R() < 0.6 ? landSpot(d, 6, 1.2) : null;
+    if (p) Object.assign(d, { state: 'walk', tx: p.x, ty: p.y, speed: 0.8 }); else Object.assign(d, { state: 'graze', timer: rnd(4, 9) });
+  },
+  duck(k, dt) {
+    k.y += k.dirY * 0.35 * dt;
+    if (k.y < WORLD.y0 + 3 || k.y > WORLD.y1 - 3 || R() < dt * 0.02) k.dirY *= -1;
+    k.x = riverX(k.y) + k.off; k.dir = k.dirY > 0 ? -1 : 1;
+  },
+  butterfly(b, dt) {
+    if (Math.hypot(b.tx - b.x, b.ty - b.y) < 0.2) {
+      const fl = FLOWERS[Math.floor(R() * FLOWERS.length)];
+      if (fl && Math.hypot(fl.x - b.x, fl.y - b.y) < 8) { b.tx = fl.x; b.ty = fl.y; } else { b.tx = b.x + rnd(-2, 2); b.ty = b.y + rnd(-2, 2); }
+    }
+    stepToward(b, b.tx, b.ty, 0.9, dt);
+    b.z = WH + 12 + Math.sin((simT + b.phase) * 3) * 5;
+  },
+};
+function tickWildlife(dt) {
+  if (!dt) return;
+  flocks.forEach(fl => tickFlock(fl, dt));
+  critters.forEach(c => TICK[c.kind](c, dt));
+}
+function drawCritter(c, t) {
+  const [gx, gy] = iso(c.x, c.y, WH), [sx, sy] = iso(c.x, c.y, c.z), ph = t + c.phase;
+  const sprite = (rows, pal, p, lift = 0) => pix(rows, sx - rows[0].length * p / 2, sy - rows.length * p - lift, pal, c.dir < 0, p);
+  switch (c.kind) {
+    case 'bird': {
+      const fly = c.state === 'fly';
+      ell(gx, gy, fly ? 4 : 5, 2, 'rgba(0,0,0,.25)');
+      sprite(fly ? (Math.floor(ph * 12) % 2 ? BIRD.flyA : BIRD.flyB) : c.state === 'peck' && Math.floor(ph * 3) % 2 ? BIRD.peck : BIRD.stand, c.pal, 1.7);
+      break;
+    }
+    case 'squirrel':
+      ell(gx, gy, 7, 2.5, 'rgba(0,0,0,.25)');
+      sprite(c.state === 'run' ? (Math.floor(ph * 10) % 2 ? SQUIRREL.runA : SQUIRREL.runB) : SQUIRREL.sit, SQ_PAL, 1.8);
+      break;
+    case 'deer': {
+      const p = 2.5, bob = c.state === 'walk' ? (Math.floor(ph * 6) % 2) * p * 0.5 : c.state === 'graze' ? (Math.floor(ph * 1.5) % 2) * p * 0.5 : 0;
+      ell(gx, gy, 18, 5, 'rgba(0,0,0,.25)');
+      sprite(c.state === 'graze' ? DEER.graze : DEER.stand, DEER_PAL, p, bob);
+      break;
+    }
+    case 'duck':
+      ell(sx, sy + 1, 9, 2.5, 'rgba(190,225,240,.25)');
+      sprite(DUCK, DUCK_PAL, 1.8, Math.sin(ph * 2) * 1.2);
+      break;
+    case 'butterfly':
+      ctx.fillStyle = c.col;
+      if (Math.floor(ph * 10) % 2) { ctx.fillRect(sx - 4, sy - 3, 3, 3); ctx.fillRect(sx + 1, sy - 3, 3, 3); }
+      else { ctx.fillRect(sx - 2, sy - 4, 2, 4); ctx.fillRect(sx, sy - 4, 2, 4); }
+      ctx.fillStyle = INK; ctx.fillRect(sx - 0.5, sy - 4, 1, 4);
+      break;
+  }
+}
+// everything standing on the lawn, back to front; things in the air go on top
+function drawOutdoors(t) {
+  OFF = [0, 0];
+  const v = visibleTiles(4), items = [];
+  TREES.forEach(tr => { if (inView(v, tr.x, tr.y)) items.push({ d: tr.x + tr.y, fn: () => drawTree(tr, t) }); });
+  BUSHES.forEach(b => { if (inView(v, b.x, b.y)) items.push({ d: b.x + b.y, fn: () => drawBush(b) }); });
+  if (inView(v, riverX(BRIDGE_Y), BRIDGE_Y)) items.push({ d: riverX(BRIDGE_Y) + BRIDGE_Y, fn: drawBridge });
+  critters.forEach(c => { if (inView(v, c.x, c.y)) items.push({ d: c.x + c.y + (c.z > WH + 20 ? 1e4 : 0), fn: () => drawCritter(c, t) }); });
+  items.sort((a, b) => a.d - b.d).forEach(i => i.fn());
+}
 
 /* ---------- live mode: real events from `foxhole serve` drive the foxes ----------
    One fox per session, in its repo's room, at its branch's corner. Between events a fox idles
@@ -1343,7 +1828,8 @@ function cubHeadsHome(p) {
 // so during an open turn a fox with nothing else to do sits at its desk thinking rather than idling.
 const TURN_ENDS = new Set(['turn.end', 'session.waiting', 'session.end']);
 function react(f, ev, instant) {
-  if (ev.type === 'prompt.submit') f.turnOpen = true; else if (TURN_ENDS.has(ev.type)) f.turnOpen = false;
+  if (ev.type === 'prompt.submit') f.turnOpen = true; else if (TURN_ENDS.has(ev.type)) { f.turnOpen = false; f.thinkSince = null; }
+  if (ev.type === 'prompt.submit' || (ev.type === 'tool.end' && f.turnOpen)) f.thinkSince = simT - ageOf(ev);
   if (f.state === 'sleeping') f.timer = 0; // any event wakes it; drop the nap timer so it can act right away
   if (f.entering) { f.pending = ev; return; } // still on its way in; acts on this once it's through the hole
   switch (ev.type) {
@@ -1353,7 +1839,7 @@ function react(f, ev, instant) {
       toDesk(f, instant); break;
     case 'tool.start': {
       const m = TOOL[ev.tool] || TOOL.Edit;
-      f.qTools++; f.cur = { k: 'tool', tool: ev.tool, target: ev.target, act: m.act, dur: LINGER };
+      f.qTools++; f.thinkSince = null; f.cur = { k: 'tool', tool: ev.tool, target: ev.target, act: m.act, dur: LINGER, startedAt: simT - ageOf(ev) };
       goOrPlace(f, spotFor(f, m.st), instant); break;
     }
     case 'tool.end':
@@ -1393,7 +1879,7 @@ function liveTick(f, dt) {
   if (f.state === 'walking') f.state = 'idle'; // arrived with no job there
   const quiet = (Date.now() - f.lastAt) / 1000;
   if (f.state === 'waiting') { if (quiet > WAIT_HOLD) nap(f); return; }
-  if (f.state === 'working' && f.act === 'think') { if (quiet > THINK_HOLD) { f.turnOpen = false; nap(f); } return; }
+  if (f.state === 'working' && f.act === 'think') { if (quiet > THINK_HOLD) { f.turnOpen = false; nap(f); } else pace(f, dt); return; }
   if (f.state !== 'idle') return;
   if (f.turnOpen) {
     if (f.cur?.k === 'desk') { f.state = 'working'; f.act = 'think'; } else toDesk(f, false);
