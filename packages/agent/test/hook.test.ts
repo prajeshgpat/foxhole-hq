@@ -130,3 +130,21 @@ describe("foxhole hook (built CLI)", () => {
     expect(res.stdout).toBe("");
   });
 });
+
+describe("readEvents", () => {
+  it("reads events logged under the old session.stop name as turn.end", () => {
+    const home = tmp();
+    const old = {
+      v: 1,
+      id: "6f1c2b9e-3f4a-4b7c-9d2e-1a2b3c4d5e6f",
+      ts: "2026-10-22T19:04:11.512Z",
+      source: "claude-code",
+      machineId: "m_test",
+      sessionId: "s1",
+      parentSessionId: null,
+      type: "session.stop",
+    };
+    writeFileSync(path.join(home, "events.jsonl"), JSON.stringify(old) + "\n");
+    expect(readEvents(home).map((e) => e.type)).toEqual(["turn.end"]);
+  });
+});

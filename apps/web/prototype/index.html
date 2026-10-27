@@ -517,7 +517,7 @@ function begin(f, s) {
     }
     case 'stop':
       f.state = 'celebrating'; f.timer = 2.8; f.done++;
-      emit(f, 'session.stop', { status: 'ok', usage: { inputTokens: f.qIn, outputTokens: f.qOut, model: f.model } });
+      emit(f, 'turn.end', { status: 'ok', usage: { inputTokens: f.qIn, outputTokens: f.qOut, model: f.model } });
       addXp(30 + f.qTools * 9 + (f.qErrors ? 0 : 20), f);
       burst(f, 'confetti', reduceMotion ? 10 : 46);
       if (!seen.has('first')) { seen.add('first'); toast('Achievement: First Quest', `${f.name} closed out “${f.quest.title}” in ${f.den.name}.`); }
@@ -1120,7 +1120,7 @@ const fmtK = n => n >= 1000 ? (n / 1000).toFixed(1) + 'k' : String(n);
 // real model ids carry versions (claude-opus-5-5), so match on the family prefix; unknown models cost nothing
 const rateOf = m => RATES[m] || RATES[Object.keys(RATES).find(k => m && m.startsWith(k))] || [0, 0];
 const cost = f => { const [i, o] = rateOf(f.model); return (f.tIn * i + f.tOut * o) / 1e6; };
-const typeClass = ev => ev.type === 'permission.request' ? 'ty-perm' : ev.type === 'session.stop' ? 'ty-stop' : ev.status === 'error' ? 'ty-err' : ev.type.startsWith('session') ? 'ty-sess' : '';
+const typeClass = ev => ev.type === 'permission.request' ? 'ty-perm' : ev.type === 'turn.end' ? 'ty-stop' : ev.status === 'error' ? 'ty-err' : ev.type.startsWith('session') ? 'ty-sess' : '';
 const awakeOf = d => d.foxes.filter(f => !f.isCub && f.state !== 'sleeping');
 // the department in view comes first, so Approve answers the fox in front of you
 const waitingAll = () => { const fr = focusRoom(); return DENS.flatMap(d => d.foxes.filter(f => f.state === 'waiting')).sort((a, b) => (b.den === fr) - (a.den === fr)); };
@@ -1135,7 +1135,7 @@ function logEvent(f, ev) {
   li.querySelector('.who span').textContent = f.isCub ? `↳ ${f.name} cub` : f.name;
   li.children[3].className = typeClass(ev);
   li.children[3].textContent = ev.type + (ev.status === 'error' ? ' ✕' : '');
-  li.children[4].textContent = ev.tool ? `${ev.tool} ${fmtTarget(ev.target)}` : ev.type === 'session.stop' && ev.usage ? `${fmtK(ev.usage.inputTokens + ev.usage.outputTokens)} tokens` : '';
+  li.children[4].textContent = ev.tool ? `${ev.tool} ${fmtTarget(ev.target)}` : ev.type === 'turn.end' && ev.usage ? `${fmtK(ev.usage.inputTokens + ev.usage.outputTokens)} tokens` : '';
   li.addEventListener('click', () => { const o = f.parent || f; select(o); visit(o.den); showJson(ev); });
   logEl.prepend(li);
   while (logEl.children.length > 160) logEl.lastChild.remove();
@@ -1339,9 +1339,9 @@ function cubHeadsHome(p) {
   p.den.foxes.push(c); burst(c, 'smoke', 6);
 }
 
-// A turn runs from prompt.submit to session.stop. No hook fires while the model thinks between tool calls,
+// A turn runs from prompt.submit to turn.end. No hook fires while the model thinks between tool calls,
 // so during an open turn a fox with nothing else to do sits at its desk thinking rather than idling.
-const TURN_ENDS = new Set(['session.stop', 'session.waiting', 'session.end']);
+const TURN_ENDS = new Set(['turn.end', 'session.waiting', 'session.end']);
 function react(f, ev, instant) {
   if (ev.type === 'prompt.submit') f.turnOpen = true; else if (TURN_ENDS.has(ev.type)) f.turnOpen = false;
   if (f.state === 'sleeping') f.timer = 0; // any event wakes it; drop the nap timer so it can act right away
@@ -1362,7 +1362,7 @@ function react(f, ev, instant) {
       if (f.cur?.k === 'tool') { f.cur.dur = TOOL_TAIL; if (f.state === 'working') f.timer = Math.min(f.timer, TOOL_TAIL); }
       break;
     case 'permission.request': halt(f, 'waiting'); f.waitSince = simT - ageOf(ev); f.cur = { k: 'perm' }; break;
-    case 'session.stop':
+    case 'turn.end':
       f.done++;
       if (instant) { toDesk(f, true); break; }
       halt(f, 'celebrating'); f.timer = 2.8; f.cur = { k: 'stop' }; burst(f, 'confetti', reduceMotion ? 10 : 46);

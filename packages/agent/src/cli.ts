@@ -52,7 +52,7 @@ function stats(events: FoxholeEvent[]): string {
   let input = 0;
   let output = 0;
   for (const e of events) {
-    if (e.type !== "session.stop" || !e.usage) continue;
+    if (e.type !== "turn.end" || !e.usage) continue;
     input += e.usage.inputTokens;
     output += e.usage.outputTokens;
   }

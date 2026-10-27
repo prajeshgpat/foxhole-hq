@@ -4064,7 +4064,8 @@ var EVENT_TYPES = [
   "permission.request",
   "session.waiting",
   "subagent.stop",
-  "session.stop",
+  /** One turn finished (Claude Code's Stop hook); the session stays open until session.end. */
+  "turn.end",
   "session.end"
 ];
 var STATUSES = ["ok", "error", "waiting"];
@@ -4094,6 +4095,13 @@ var FoxholeEvent = external_exports.object({
   repo: external_exports.string().min(1).optional(),
   branch: external_exports.string().min(1).optional()
 }).strict();
+var RENAMED_TYPES = { "session.stop": "turn.end" };
+function upgradeEvent(input) {
+  if (!input || typeof input !== "object") return input;
+  const type = input.type;
+  const renamed = typeof type === "string" ? RENAMED_TYPES[type] : void 0;
+  return renamed ? { ...input, type: renamed } : input;
+}
 function safeParseEvent(input) {
   return FoxholeEvent.safeParse(input);
 }
@@ -4244,7 +4252,7 @@ function typeFor(input) {
     case "SubagentStop":
       return { type: "subagent.stop", status: "ok" };
     case "Stop":
-      return { type: "session.stop", status: "ok" };
+      return { type: "turn.end", status: "ok" };
     case "SessionEnd":
       return { type: "session.end" };
     default:
@@ -4271,7 +4279,7 @@ function normalizeClaudeHook(input, ctx) {
     event.tool = input.tool_name;
     event.target = targetFor(input.tool_name, input.tool_input, input.cwd ?? process.cwd(), ctx.targetMode);
   }
-  if ((mapped.type === "session.stop" || mapped.type === "session.end") && ctx.usage) event.usage = ctx.usage;
+  if ((mapped.type === "turn.end" || mapped.type === "session.end") && ctx.usage) event.usage = ctx.usage;
   if (ctx.repo.repo) event.repo = ctx.repo.repo;
   if (ctx.repo.branch) event.branch = ctx.repo.branch;
   return event;
@@ -4396,7 +4404,7 @@ function readEvents(home) {
   try {
     return readFileSync(eventsFile(home), "utf8").split("\n").filter(Boolean).flatMap((line2) => {
       try {
-        return [JSON.parse(line2)];
+        return [upgradeEvent(JSON.parse(line2))];
       } catch {
         return [];
       }
@@ -4473,7 +4481,7 @@ function parseLines(text) {
   return text.split("\n").flatMap((line2) => {
     if (!line2.trim()) return [];
     try {
-      const result = safeParseEvent(JSON.parse(line2));
+      const result = safeParseEvent(upgradeEvent(JSON.parse(line2)));
       return result.success ? [result.data] : [];
     } catch {
       return [];
@@ -4648,7 +4656,7 @@ function stats(events) {
   let input = 0;
   let output = 0;
   for (const e of events) {
-    if (e.type !== "session.stop" || !e.usage) continue;
+    if (e.type !== "turn.end" || !e.usage) continue;
     input += e.usage.inputTokens;
     output += e.usage.outputTokens;
   }

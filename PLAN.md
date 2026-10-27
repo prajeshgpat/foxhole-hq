@@ -156,7 +156,7 @@ All adapters normalize into one schema:
 | `permission.request`            | Stands, raises paw, bouncing "!", light beam, push alert                   |
 | `session.waiting`               | Agent is idle waiting for your next message: fox sits and looks toward you |
 | `tool.end` status=error         | Small stumble + puff of smoke                                              |
-| `session.stop`                  | Confetti + floating XP, then curls up in bed                               |
+| `turn.end`                      | A turn finished: confetti + floating XP, then idles until the next prompt  |
 | `session.end`                   | Fox sleeps; history stays                                                  |
 
 **Privacy defaults:** only tool names, short targets, status, and token usage are sent. No code, prompts, diffs, or file contents — ever. A setting can hash or hide `target` entirely, and dens for private repos can show an alias instead of the repo name. A **local-only mode** runs the den on `localhost` with nothing leaving the machine.

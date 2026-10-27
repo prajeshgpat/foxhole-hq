@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 import { appendFileSync, existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import type { FoxholeEvent } from "@foxhole-hq/schema";
+import { upgradeEvent, type FoxholeEvent } from "@foxhole-hq/schema";
 import type { TargetMode } from "./target";
 import { emptyCursor, type UsageCursor } from "./usage";
 
@@ -75,7 +75,7 @@ export function readEvents(home: string): FoxholeEvent[] {
       .filter(Boolean)
       .flatMap((line) => {
         try {
-          return [JSON.parse(line) as FoxholeEvent];
+          return [upgradeEvent(JSON.parse(line)) as FoxholeEvent];
         } catch {
           return [];
         }

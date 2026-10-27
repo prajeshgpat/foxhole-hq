@@ -67,6 +67,11 @@ function stream(port: number, until: (messages: string[]) => boolean): Promise<s
 }
 
 describe("parseLines", () => {
+  it("reads events logged under the old session.stop name as turn.end", () => {
+    const old = { ...event("turn.end"), type: "session.stop" };
+    expect(parseLines(JSON.stringify(old)).map((e) => e.type)).toEqual(["turn.end"]);
+  });
+
   it("keeps valid events and drops blank, broken or off-schema lines", () => {
     const good = event("session.start");
     const text = [JSON.stringify(good), "", "{not json", JSON.stringify({ ...good, prompt: "secret" })].join("\n");

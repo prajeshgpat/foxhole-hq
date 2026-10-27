@@ -20,7 +20,7 @@ describe("normalizeClaudeHook", () => {
     ["PreToolUse", "tool.start"],
     ["PostToolUse", "tool.end"],
     ["SubagentStop", "subagent.stop"],
-    ["Stop", "session.stop"],
+    ["Stop", "turn.end"],
     ["SessionEnd", "session.end"],
   ])("maps %s to %s", (hook, type) => {
     const e = run({

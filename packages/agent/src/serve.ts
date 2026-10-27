@@ -1,7 +1,7 @@
 import { closeSync, openSync, readFileSync, readSync, statSync } from "node:fs";
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
 import type { AddressInfo } from "node:net";
-import { safeParseEvent, type FoxholeEvent } from "@foxhole-hq/schema";
+import { safeParseEvent, upgradeEvent, type FoxholeEvent } from "@foxhole-hq/schema";
 import { eventsFile } from "./store";
 
 /**
@@ -35,7 +35,7 @@ export function parseLines(text: string): FoxholeEvent[] {
   return text.split("\n").flatMap((line) => {
     if (!line.trim()) return [];
     try {
-      const result = safeParseEvent(JSON.parse(line));
+      const result = safeParseEvent(upgradeEvent(JSON.parse(line)));
       return result.success ? [result.data] : [];
     } catch {
       return [];

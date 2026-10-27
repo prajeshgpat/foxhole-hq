@@ -62,7 +62,7 @@ function typeFor(input: ClaudeHookInput): { type: EventType; status?: FoxholeEve
     case "SubagentStop":
       return { type: "subagent.stop", status: "ok" };
     case "Stop":
-      return { type: "session.stop", status: "ok" };
+      return { type: "turn.end", status: "ok" };
     case "SessionEnd":
       return { type: "session.end" };
     default:
@@ -92,7 +92,7 @@ export function normalizeClaudeHook(input: ClaudeHookInput, ctx: NormalizeContex
     event.tool = input.tool_name;
     event.target = targetFor(input.tool_name, input.tool_input, input.cwd ?? process.cwd(), ctx.targetMode);
   }
-  if ((mapped.type === "session.stop" || mapped.type === "session.end") && ctx.usage) event.usage = ctx.usage;
+  if ((mapped.type === "turn.end" || mapped.type === "session.end") && ctx.usage) event.usage = ctx.usage;
   if (ctx.repo.repo) event.repo = ctx.repo.repo;
   if (ctx.repo.branch) event.branch = ctx.repo.branch;
   return event;

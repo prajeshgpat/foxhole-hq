@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { MAX_TARGET_LENGTH, parseEvent, safeParseEvent } from "../src";
+import { MAX_TARGET_LENGTH, parseEvent, safeParseEvent, upgradeEvent } from "../src";
 
 const base = {
   v: 1,
@@ -46,6 +46,18 @@ describe("FoxholeEvent", () => {
     const subagent = { ...base, type: "subagent.stop", parentSessionId: "s_41a", sessionId: "agent-7" };
     expect(safeParseEvent({ ...subagent, agentType: "Explore" }).success).toBe(true);
     expect(safeParseEvent({ ...subagent, agentType: "x".repeat(MAX_TARGET_LENGTH + 1) }).success).toBe(false);
+  });
+
+  it("reads the old session.stop name as turn.end", () => {
+    const upgraded = upgradeEvent({ ...base, type: "session.stop" });
+    expect(upgraded).toMatchObject({ type: "turn.end" });
+    expect(safeParseEvent(upgraded).success).toBe(true);
+    expect(safeParseEvent({ ...base, type: "session.stop" }).success).toBe(false);
+  });
+
+  it("leaves current events and non-objects alone when upgrading", () => {
+    expect(upgradeEvent(base)).toBe(base);
+    expect(upgradeEvent("nope")).toBe("nope");
   });
 
   it("rejects other schema versions and unknown types", () => {

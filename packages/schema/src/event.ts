@@ -17,7 +17,8 @@ export const EVENT_TYPES = [
   "permission.request",
   "session.waiting",
   "subagent.stop",
-  "session.stop",
+  /** One turn finished (Claude Code's Stop hook); the session stays open until session.end. */
+  "turn.end",
   "session.end",
 ] as const;
 
@@ -59,6 +60,17 @@ export const FoxholeEvent = z
   .strict();
 export type FoxholeEvent = z.infer<typeof FoxholeEvent>;
 export type EventType = (typeof EVENT_TYPES)[number];
+
+/** Event types that were renamed; events logged before a rename are read under the new name. */
+const RENAMED_TYPES: Readonly<Record<string, EventType>> = { "session.stop": "turn.end" };
+
+/** Brings an event written by an older version up to the current shape. Call it before validating logged events. */
+export function upgradeEvent(input: unknown): unknown {
+  if (!input || typeof input !== "object") return input;
+  const type = (input as { type?: unknown }).type;
+  const renamed = typeof type === "string" ? RENAMED_TYPES[type] : undefined;
+  return renamed ? { ...input, type: renamed } : input;
+}
 
 export function parseEvent(input: unknown): FoxholeEvent {
   return FoxholeEvent.parse(input);
