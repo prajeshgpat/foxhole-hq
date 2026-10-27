@@ -6,3 +6,6 @@ coverage
 # Build output is ignored except the plugin bundle, which Claude Code loads straight from git
 dist
 !packages/plugin-claude/dist
+
+# per-developer Claude Code settings
+.claude/settings.local.json

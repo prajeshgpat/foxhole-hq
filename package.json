@@ -10,6 +10,7 @@
   },
   "scripts": {
     "build": "turbo run build",
+    "den": "turbo run build --filter=@foxhole-hq/agent --output-logs=errors-only && node packages/agent/dist/cli.mjs serve",
     "test": "turbo run test",
     "typecheck": "turbo run typecheck",
     "lint": "eslint .",

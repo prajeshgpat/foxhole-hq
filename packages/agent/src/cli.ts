@@ -1,5 +1,8 @@
+import { existsSync } from "node:fs";
+import { fileURLToPath } from "node:url";
 import type { FoxholeEvent } from "@foxhole-hq/schema";
 import { handleClaudeHook } from "./hook";
+import { DEFAULT_PORT, startServer } from "./serve";
 import { eventsFile, homeDir, readEvents } from "./store";
 
 const HELP = `foxhole: see your AI coding agents work
@@ -9,6 +12,7 @@ Usage:
   foxhole tail [n]      Show the last n recorded events (default 20)
   foxhole stats         Sessions, tool calls and tokens recorded so far
   foxhole where         Print where events are stored
+  foxhole serve [port]  Open your live den at http://127.0.0.1:${DEFAULT_PORT} (FOXHOLE_PAGE overrides the page)
 
 Settings live in ~/.foxhole/config.json, e.g. { "targets": "hash" } to hash file names and commands,
 or { "targets": "hidden" } to drop them. Set FOXHOLE_HOME to use another folder.`;
@@ -66,6 +70,38 @@ function stats(events: FoxholeEvent[]): string {
   ].join("\n");
 }
 
+// Both built bundles (packages/*/dist/*.mjs) sit three levels below the repo root.
+const DEFAULT_PAGE = fileURLToPath(new URL("../../../apps/web/prototype/index.html", import.meta.url));
+
+async function serve(home: string, portArg: string | undefined): Promise<number> {
+  const page = process.env.FOXHOLE_PAGE || DEFAULT_PAGE;
+  if (!existsSync(page)) {
+    process.stderr.write(`Can't find the den page at ${page}. Set FOXHOLE_PAGE to its path.\n`);
+    return 1;
+  }
+  const port = portArg ? Number(portArg) : DEFAULT_PORT;
+  if (!Number.isInteger(port) || port < 0 || port > 65535) {
+    process.stderr.write(`"${portArg}" is not a port number.\n`);
+    return 1;
+  }
+  try {
+    const den = await startServer({ home, page, port });
+    process.stdout.write(`Your den is live at http://127.0.0.1:${den.port}  (Ctrl+C to stop)\n`);
+    return await new Promise((resolve) =>
+      process.once("SIGINT", () => {
+        den.close();
+        resolve(0);
+      }),
+    );
+  } catch (err) {
+    const inUse = (err as NodeJS.ErrnoException).code === "EADDRINUSE";
+    process.stderr.write(
+      inUse ? `Port ${port} is busy. Try: foxhole serve <another port>\n` : `${(err as Error).message}\n`,
+    );
+    return 1;
+  }
+}
+
 export async function main(argv: string[]): Promise<number> {
   const [cmd, arg] = argv;
   const home = homeDir();
@@ -88,6 +124,8 @@ export async function main(argv: string[]): Promise<number> {
     case "stats":
       process.stdout.write(stats(readEvents(home)) + "\n");
       return 0;
+    case "serve":
+      return serve(home, arg);
     case "where":
       process.stdout.write(eventsFile(home) + "\n");
       return 0;

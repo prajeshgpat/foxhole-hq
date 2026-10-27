@@ -5,6 +5,10 @@ var __export = (target, all) => {
     __defProp(target, name, { get: all[name], enumerable: true });
 };
 
+// src/cli.ts
+import { existsSync as existsSync2 } from "fs";
+import { fileURLToPath } from "url";
+
 // src/hook.ts
 import { randomUUID as randomUUID2 } from "crypto";
 
@@ -4084,6 +4088,8 @@ var FoxholeEvent = external_exports.object({
   tool: external_exports.string().min(1).optional(),
   target: external_exports.string().max(MAX_TARGET_LENGTH).nullable().optional(),
   status: external_exports.enum(STATUSES).optional(),
+  /** For subagent events: the agent's type label (e.g. "Explore"), never its prompt or output. */
+  agentType: external_exports.string().min(1).max(MAX_TARGET_LENGTH).optional(),
   usage: Usage.optional(),
   repo: external_exports.string().min(1).optional(),
   branch: external_exports.string().min(1).optional()
@@ -4248,17 +4254,19 @@ function typeFor(input) {
 function normalizeClaudeHook(input, ctx) {
   const mapped = typeFor(input);
   if (!mapped || !input.session_id) return null;
+  const subagentId = mapped.type === "subagent.stop" ? input.agent_id : void 0;
   const event = {
     v: 1,
     id: ctx.id,
     ts: ctx.ts,
     source: "claude-code",
     machineId: ctx.machineId,
-    sessionId: input.session_id,
-    parentSessionId: null,
+    sessionId: subagentId || input.session_id,
+    parentSessionId: subagentId ? input.session_id : null,
     type: mapped.type
   };
   if (mapped.status) event.status = mapped.status;
+  if (subagentId && input.agent_type) event.agentType = input.agent_type.slice(0, MAX_TARGET_LENGTH);
   if (input.tool_name && (mapped.type === "tool.start" || mapped.type === "tool.end")) {
     event.tool = input.tool_name;
     event.target = targetFor(input.tool_name, input.tool_input, input.cwd ?? process.cwd(), ctx.targetMode);
@@ -4453,6 +4461,153 @@ function handleClaudeHook(raw, opts) {
   return checked.data;
 }
 
+// src/serve.ts
+import { closeSync as closeSync2, openSync as openSync2, readFileSync as readFileSync2, readSync as readSync2, statSync as statSync2 } from "fs";
+import { createServer } from "http";
+var DEFAULT_PORT = 4317;
+var BACKLOG_EVENTS = 500;
+var POLL_MS = 500;
+var HEARTBEAT_MS = 15e3;
+var NEWLINE = 10;
+function parseLines(text) {
+  return text.split("\n").flatMap((line2) => {
+    if (!line2.trim()) return [];
+    try {
+      const result = safeParseEvent(JSON.parse(line2));
+      return result.success ? [result.data] : [];
+    } catch {
+      return [];
+    }
+  });
+}
+var sizeOf = (file) => {
+  try {
+    return statSync2(file).size;
+  } catch {
+    return 0;
+  }
+};
+function readRange(file, start, end) {
+  const buf = Buffer.alloc(end - start);
+  const fd = openSync2(file, "r");
+  try {
+    readSync2(fd, buf, 0, buf.length, start);
+  } finally {
+    closeSync2(fd);
+  }
+  return buf;
+}
+function followEvents(file, pollMs, onEvents) {
+  let offset = sizeOf(file);
+  let pending = Buffer.alloc(0);
+  const poll = () => {
+    const size = sizeOf(file);
+    if (size < offset) {
+      offset = 0;
+      pending = Buffer.alloc(0);
+    }
+    if (size === offset) return;
+    const chunk = Buffer.concat([pending, readRange(file, offset, size)]);
+    offset = size;
+    const end = chunk.lastIndexOf(NEWLINE);
+    pending = chunk.subarray(end + 1);
+    if (end < 0) return;
+    const events = parseLines(chunk.subarray(0, end).toString("utf8"));
+    if (events.length) onEvents(events);
+  };
+  const timer = setInterval(() => {
+    try {
+      poll();
+    } catch (err) {
+      process.stderr.write(`foxhole serve: could not read ${file}: ${err.message}
+`);
+    }
+  }, pollMs);
+  return {
+    /** Bytes already handed to onEvents (or before the start), i.e. what a new viewer's backlog covers. */
+    consumed: () => offset - pending.length,
+    stop: () => clearInterval(timer)
+  };
+}
+var sse = (res, data, name) => res.write(`${name ? `event: ${name}
+` : ""}data: ${data}
+
+`);
+function startServer(opts) {
+  const file = eventsFile(opts.home);
+  const viewers = /* @__PURE__ */ new Set();
+  const follower = followEvents(file, opts.pollMs ?? POLL_MS, (events) => {
+    for (const res of viewers) for (const e of events) sse(res, JSON.stringify(e));
+  });
+  let port = 0;
+  const openStream = (req, res) => {
+    res.writeHead(200, {
+      "Content-Type": "text/event-stream; charset=utf-8",
+      "Cache-Control": "no-store",
+      Connection: "keep-alive"
+    });
+    const upTo = follower.consumed();
+    const backlog = upTo ? parseLines(readRange(file, 0, upTo).toString("utf8")).slice(-BACKLOG_EVENTS) : [];
+    for (const e of backlog) sse(res, JSON.stringify(e));
+    sse(res, "{}", "ready");
+    viewers.add(res);
+    const heartbeat = setInterval(() => res.write(": still here\n\n"), HEARTBEAT_MS);
+    req.on("close", () => {
+      clearInterval(heartbeat);
+      viewers.delete(res);
+    });
+  };
+  const handle = (req, res) => {
+    const allowed = [`127.0.0.1:${port}`, `localhost:${port}`];
+    if (!allowed.includes(req.headers.host ?? "")) {
+      res.writeHead(403).end("Forbidden");
+      return;
+    }
+    const url = new URL(req.url ?? "/", `http://${req.headers.host}`);
+    if (req.method !== "GET") {
+      res.writeHead(405).end("Method not allowed");
+    } else if (url.pathname === "/events") {
+      openStream(req, res);
+    } else if (url.pathname === "/" && !url.searchParams.has("live")) {
+      res.writeHead(302, { Location: "/?live" }).end();
+    } else if (url.pathname === "/") {
+      res.writeHead(200, {
+        "Content-Type": "text/html; charset=utf-8",
+        "Cache-Control": "no-store",
+        "X-Content-Type-Options": "nosniff",
+        "Referrer-Policy": "no-referrer"
+      });
+      res.end(readFileSync2(opts.page));
+    } else {
+      res.writeHead(404).end("Not found");
+    }
+  };
+  const server = createServer((req, res) => {
+    try {
+      handle(req, res);
+    } catch (err) {
+      process.stderr.write(`foxhole serve: ${req.url}: ${err.message}
+`);
+      if (!res.headersSent) res.writeHead(500);
+      res.end("Something went wrong; see the terminal running foxhole serve.");
+    }
+  });
+  return new Promise((resolve, reject) => {
+    server.once("error", reject);
+    server.listen(opts.port ?? DEFAULT_PORT, "127.0.0.1", () => {
+      port = server.address().port;
+      resolve({
+        port,
+        close: () => {
+          follower.stop();
+          for (const res of viewers) res.end();
+          server.close();
+        }
+      });
+    });
+  });
+}
+
 // src/cli.ts
 var HELP = `foxhole: see your AI coding agents work
 
@@ -4461,6 +4616,7 @@ Usage:
   foxhole tail [n]      Show the last n recorded events (default 20)
   foxhole stats         Sessions, tool calls and tokens recorded so far
   foxhole where         Print where events are stored
+  foxhole serve [port]  Open your live den at http://127.0.0.1:${DEFAULT_PORT} (FOXHOLE_PAGE overrides the page)
 
 Settings live in ~/.foxhole/config.json, e.g. { "targets": "hash" } to hash file names and commands,
 or { "targets": "hidden" } to drop them. Set FOXHOLE_HOME to use another folder.`;
@@ -4506,6 +4662,40 @@ function stats(events) {
     `tokens       ${fmtTokens(input)} in / ${fmtTokens(output)} out`
   ].join("\n");
 }
+var DEFAULT_PAGE = fileURLToPath(new URL("../../../apps/web/prototype/index.html", import.meta.url));
+async function serve(home, portArg) {
+  const page = process.env.FOXHOLE_PAGE || DEFAULT_PAGE;
+  if (!existsSync2(page)) {
+    process.stderr.write(`Can't find the den page at ${page}. Set FOXHOLE_PAGE to its path.
+`);
+    return 1;
+  }
+  const port = portArg ? Number(portArg) : DEFAULT_PORT;
+  if (!Number.isInteger(port) || port < 0 || port > 65535) {
+    process.stderr.write(`"${portArg}" is not a port number.
+`);
+    return 1;
+  }
+  try {
+    const den = await startServer({ home, page, port });
+    process.stdout.write(`Your den is live at http://127.0.0.1:${den.port}  (Ctrl+C to stop)
+`);
+    return await new Promise(
+      (resolve) => process.once("SIGINT", () => {
+        den.close();
+        resolve(0);
+      })
+    );
+  } catch (err) {
+    const inUse = err.code === "EADDRINUSE";
+    process.stderr.write(
+      inUse ? `Port ${port} is busy. Try: foxhole serve <another port>
+` : `${err.message}
+`
+    );
+    return 1;
+  }
+}
 async function main(argv) {
   const [cmd, arg] = argv;
   const home = homeDir();
@@ -4526,6 +4716,8 @@ async function main(argv) {
     case "stats":
       process.stdout.write(stats(readEvents(home)) + "\n");
       return 0;
+    case "serve":
+      return serve(home, arg);
     case "where":
       process.stdout.write(eventsFile(home) + "\n");
       return 0;

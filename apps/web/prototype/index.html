@@ -156,8 +156,8 @@ pre { margin: 0; padding: 10px; border-radius: 8px; background: #0d1412; border:
   <header>
     <div class="brand">
       <h1>Foxhole <span>HQ</span></h1>
-      <span class="hq">prajesh's HQ · 3 departments</span>
-      <span class="live"><i></i>Live</span>
+      <span class="hq" id="hq">prajesh's HQ · 3 departments</span>
+      <span class="live" id="conn"><i></i><span>Live</span></span>
     </div>
     <div class="controls">
       <div class="chip"><span class="lvl-badge" id="lvl">Lv 7</span><div class="bar"><b id="xpbar"></b></div><span class="mono" id="xptext"></span></div>
@@ -226,6 +226,8 @@ pre { margin: 0; padding: 10px; border-radius: 8px; background: #0d1412; border:
 (() => {
 const TAU = Math.PI * 2, R = Math.random, rnd = (a, b) => a + R() * (b - a);
 const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
+// ?live (what `foxhole serve` opens) follows your real sessions; without it the den plays the scripted demo
+const LIVE = new URLSearchParams(location.search).has('live');
 const css = getComputedStyle(document.documentElement);
 const V = n => css.getPropertyValue(n).trim();
 const COL = { fg: V('--fg'), muted: V('--muted'), ok: V('--ok'), alert: V('--alert'), fox: V('--fox'), err: V('--err') };
@@ -233,13 +235,23 @@ const FONT = '"Bricolage Grotesque", system-ui, sans-serif', MONO = '"JetBrains 
 const TW = 64, TH = 32, COLS = 11, ROWS = 9, WH = 100, PART = 26;
 const P = { floorA: '#6f4d36', floorB: '#674731', hallA: '#4b433b', hallB: '#463e36', wallR: '#432f24', wallL: '#382820', base: '#2b1e17', part: '#5a4536',
   desk: '#a0714a', mon: '#20272b', scrOn: '#9be6ff', scrDim: '#2a4450', shelf: '#7b5337', rack: '#2c3339', cush: '#b98e66', cushIn: '#dcb991',
-  dirt: '#56392a', hole: '#140d0a', brass: '#c99a4a', cork: '#a77d52', pot: '#b0613f', leaf: '#5f9a5a', gold: '#e7b84a', couch: '#3f6f78', lobby: '#7a5c42', lobbyB: '#735640' };
+  dirt: '#56392a', hole: '#140d0a', brass: '#c99a4a', cork: '#a77d52', pot: '#b0613f', leaf: '#5f9a5a',
+  grassA: '#35512c', grassB: '#314b29', blade: '#4b7039', lip: '#3f6232', soil: '#4a3323', strata: '#3a281b' };
 
-/* ---------- the floor plan: every repo is a department room off shared corridors ---------- */
-const BW = 24, BH = 20;
-const SLOTS = [[0, 0], [13, 0], [0, 11]];
-const LOBBY = { ox: 13, oy: 11, name: 'Commons' };
+/* ---------- the floor plan: a basement dug into a lawn, one room per repo with an active session ----------
+   Rooms sit side by side along the back wall. Open rooms pack left to right, so the basement widens
+   when a room opens and narrows when one closes. The lawn is level with the wall tops. */
+const ROOM_W = 11;                // tiles per room along the back wall (= COLS)
+const BH = 9;                     // basement depth (= ROWS)
+const LAWN = 4;                   // tiles of lawn shown around the basement
+let BW = 0;                       // current basement width; follows the room animations
 const RUGS = [['#3d5a80', '#5b7fa8'], ['#8d3c2f', '#b2563f'], ['#3f6b4f', '#5f9270']];
+const HOLE_X = 6.45;              // each room's wall hole (and the grass hole above it), in room tiles
+const GRASS_HOLE_Y = -2.4;        // the grass hole sits this far behind the back wall
+const ROOM_ANIM = 1.1;            // seconds for a room to open or close
+const ROOM_IDLE = 5 * 60;         // seconds without activity before a room (with every fox asleep) disappears
+const DIVE_T = 0.55;              // seconds for a fox to disappear down the grass hole
+const HOP_T = 0.7;                // seconds for the jump-and-spin when a fox is tapped
 
 /* ---------- geometry; OFF shifts a room's local tiles onto the floor ---------- */
 let OFF = [0, 0];
@@ -283,6 +295,7 @@ const ICON = {
   task: ['x.x.x', '.....', '.xxx.', '.xxx.'],
   quest: ['xxxxxx', 'x....x', 'x.xx.x', 'x....x', 'xxxxxx'],
   bang: ['x', 'x', 'x', '.', 'x'],
+  think: ['xx.xx.xx', 'xx.xx.xx'],
 };
 const INK = '#1b1714', PX = 2.4;
 function pix(rows, ox, oy, pal, flip, p) {
@@ -313,10 +326,10 @@ const ST = {
   shelf: i => [{ x: 1.05, y: 3.6, face: -1 }, { x: 1.1, y: 4.6, face: -1 }, { x: 1.6, y: 4.1, face: -1 }][i % 3],
   rack: i => [{ x: 1.25, y: 6.45, face: -1 }, { x: 1.45, y: 5.55, face: -1 }, { x: 1.8, y: 7.1, face: -1 }][i % 3],
   window: i => [{ x: 8.55, y: 1.75, face: 1 }, { x: 9.6, y: 2.4, face: 1 }][i % 2],
-  burrow: i => [{ x: 8.45, y: 6.4, face: 1 }, { x: 8.2, y: 7.05, face: 1 }][i % 2],
+  burrow: i => [{ x: HOLE_X - 0.6, y: 1.0, face: 1 }, { x: HOLE_X + 0.6, y: 1.05, face: -1 }][i % 2],
   bed: k => ({ x: [2.4, 4.3, 6.2, 8.0][k % 4], y: 7.75, face: 1 }),
 };
-const BASE_BLOCK = ['0,3', '0,4', '0,5', '0,6', '9,1', '9,6', '10,6', '9,7', '10,7', '10,0', '2,0', '3,0'];
+const BASE_BLOCK = ['0,3', '0,4', '0,5', '0,6', '9,1', '10,0', '2,0', '3,0'];
 function rebuildBlocked(d) {
   d.blocked = new Set(BASE_BLOCK);
   d.foxes.filter(f => !f.isCub).forEach(f => {
@@ -350,6 +363,9 @@ const TOOL = {
   Edit: { st: 'desk', act: 'type', d: [4, 6] }, Write: { st: 'desk', act: 'type', d: [3.5, 5] },
   Bash: { st: 'rack', act: 'bash', d: [3, 4.2] }, WebSearch: { st: 'window', act: 'gaze', d: [3, 4] },
   Task: { st: 'burrow', act: 'task', d: [1.8, 2.4] },
+  // tools the demo never scripts but real sessions use
+  Glob: { st: 'shelf', act: 'read', d: [2, 3] }, WebFetch: { st: 'window', act: 'gaze', d: [3, 4] },
+  Agent: { st: 'burrow', act: 'task', d: [1.8, 2.4] }, NotebookEdit: { st: 'desk', act: 'type', d: [4, 6] },
 };
 const RATES = { 'claude-sonnet': [3, 15], 'claude-opus': [5, 25], 'claude-haiku': [1, 5], 'codex': [1.25, 10] };
 const DEN_DEFS = [
@@ -390,14 +406,18 @@ function makeFox(o, den) {
 }
 function addAgent(d, a) {
   let bIdx = d.branches.findIndex(b => b.name === a.branch);
-  if (bIdx < 0) { d.branches.push({ name: a.branch, slot: d.branches.length, col: BCOL[d.branches.length % 4], foxes: [] }); bIdx = d.branches.length - 1; }
+  if (bIdx < 0) { d.branches.push({ name: a.branch, slot: d.branches.length % BAREAS.length, col: BCOL[d.branches.length % 4], foxes: [] }); bIdx = d.branches.length - 1; }
   const br = d.branches[bIdx], f = makeFox({ ...a, bIdx, bDesk: br.foxes.length, bed: d.foxes.filter(o => !o.isCub).length % 4 }, d);
   br.foxes.push(f); d.foxes.push(f); rebuildBlocked(d);
   return f;
 }
-const DENS = DEN_DEFS.map((def, i) => {
-  const d = { id: 'd' + i, idx: i, repo: def.repo, name: def.repo.replace('github.com/', ''), ox: SLOTS[i][0], oy: SLOTS[i][1],
-    rug: RUGS[i], foxes: [], parts: [], branches: [], later: def.later || [] };
+// t runs 0→1 while a room opens (and back while it closes); grow is the eased share of its width on the floor
+function makeDen(repo, i) {
+  return { id: 'd' + i, idx: i, repo, name: repo.replace('github.com/', ''), ox: 0, oy: 0,
+    rug: RUGS[i % RUGS.length], foxes: [], parts: [], branches: [], later: [], open: false, t: 0, grow: 0, quiet: 0 };
+}
+const DENS = (LIVE ? [] : DEN_DEFS).map((def, i) => {
+  const d = { ...makeDen(def.repo, i), later: def.later || [] };
   def.agents.forEach(a => addAgent(d, a));
   d.foxes.forEach((f, j) => {
     if (f.asleep) { Object.assign(f, ST.bed(f.bed)); f.state = 'sleeping'; f.cur = { k: 'rest' }; f.timer = f.asleep; }
@@ -406,12 +426,21 @@ const DENS = DEN_DEFS.map((def, i) => {
   });
   return d;
 });
-const wpos = f => isoAbs(f.x + f.den.ox, f.y + f.den.oy);
+const wpos = f => isoAbs(f.x + f.den.ox, f.y + f.den.oy, f.z || 0);
+// a new fox trots across the lawn, dives down its room's grass hole and pops out of the wall hole
+function enterViaHoles(f, then) {
+  Object.assign(f, { x: HOLE_X + 2.2, y: GRASS_HOLE_Y - 0.5, z: WH, path: [[HOLE_X, GRASS_HOLE_Y]], travel: true,
+    state: 'walking', cur: { k: 'dive' }, entering: true, afterEntry: then });
+}
+function popOut(f) {
+  Object.assign(f, { x: HOLE_X, y: 0.15, z: 0, path: [[HOLE_X, 1.1]], travel: true, state: 'walking', cur: { k: 'popOut' } });
+  burst(f, 'smoke', 8);
+}
 function join(d, a) {
   const isNew = !d.branches.some(b => b.name === a.branch);
   const f = addAgent(d, a), mate = d.branches[f.bIdx].foxes.find(o => o !== f);
-  f.x = 5.2; f.y = 8.6; f.cur = { k: 'boot' }; f.timer = 0.4; f.steps = [{ k: 'start' }];
-  const s = deskSpot(f); burst({ den: d, x: s.x, y: s.y - 0.9 }, 'smoke', 12);
+  f.steps = [{ k: 'start' }];
+  enterViaHoles(f, () => { f.cur = { k: 'boot' }; f.timer = 0.4; });
   toast(`New agent in ${d.name}`, isNew ? `${f.name} started ${a.branch} and got a new branch corner.` : `${f.name} joined ${a.branch} and got the desk next to ${mate.name}.`);
   buildDepts();
 }
@@ -440,7 +469,7 @@ function planQuest(f) {
 const dir = p => p.split('/').slice(-2, -1)[0] || p;
 
 /* ---------- simulation ---------- */
-let simT = 0, speed = 1, paused = false, xp = 520, level = 7, trophies = 3;
+let simT = 0, speed = 1, paused = false, xp = 520, level = 7;
 let hideTargets = false, selected = null;
 const seen = new Set();
 const xpNeed = l => 300 + l * 90;
@@ -451,6 +480,7 @@ function spotFor(f, st) {
   const n = f.den.foxes.filter(o => o !== f && o.target && o.target.st === st).length;
   return { ...ST[st](n), st };
 }
+const rugSpot = () => ({ x: rnd(2.6, 7.6), y: rnd(6.4, 7.0), face: R() < 0.5 ? 1 : -1, st: 'rug' });
 function goTo(f, sp) { f.target = sp; f.path = findPath(f.den, f.x, f.y, sp.x, sp.y); f.travel = true; f.state = 'walking'; }
 function usage(f) {
   const u = { inputTokens: Math.round(rnd(900, 4200)), outputTokens: Math.round(rnd(120, 900)), model: f.model };
@@ -458,6 +488,7 @@ function usage(f) {
   return u;
 }
 function emit(f, type, extra = {}) {
+  if (LIVE) return; // live foxes only act out real events; they never make any up
   const ev = { v: 1, ts: new Date().toISOString(), source: f.source, machineId: f.machine, sessionId: f.session,
     parentSessionId: f.parent ? f.parent.session : null, type, ...extra, repo: f.den.repo, branch: (f.parent || f).branch };
   const owner = f.parent || f;
@@ -492,9 +523,9 @@ function begin(f, s) {
       if (!seen.has('first')) { seen.add('first'); toast('Achievement: First Quest', `${f.name} closed out “${f.quest.title}” in ${f.den.name}.`); }
       else if (!f.qErrors && !seen.has('zero')) { seen.add('zero'); toast('Achievement: Zero-Error Shift', `${f.name} finished a quest with no tool errors.`); }
       break;
-    case 'wander': goTo(f, { x: rnd(2.6, 7.6), y: rnd(6.4, 7.0), face: R() < 0.5 ? 1 : -1, st: 'rug' }); break;
+    case 'wander': goTo(f, rugSpot()); break;
     case 'rest': goTo(f, spotFor(f, 'bed')); break;
-    case 'home': goTo(f, spotFor(f, 'burrow')); break;
+    case 'home': goTo(f, { x: HOLE_X, y: 0.3, st: 'hole' }); break;
   }
 }
 function arrive(f) {
@@ -503,10 +534,16 @@ function arrive(f) {
     if (s.perm) { f.state = 'waiting'; f.waitSince = simT; emit(f, 'permission.request', { tool: s.tool, target: s.target, status: 'waiting' }); }
     else startWork(f, s);
   } else if (s.k === 'wander') { f.state = 'idle'; f.target = null; f.timer = rnd(1.4, 2.6); }
+  else if (s.k === 'desk') { f.state = 'idle'; f.target = null; }
   else if (s.k === 'rest') { f.state = 'sleeping'; f.target = null; f.timer = rnd(18, 30); f.steps = [{ k: 'start' }]; emit(f, 'session.end'); }
   else if (s.k === 'home') { emit(f, 'subagent.stop', { status: 'ok' }); burst(f, 'smoke', 6); f.den.foxes = f.den.foxes.filter(o => o !== f); }
+  else if (s.k === 'dive') { f.state = 'diving'; f.dive = 0; }
+  else if (s.k === 'popOut') {
+    Object.assign(f, { state: 'idle', cur: null, target: null, entering: false });
+    const then = f.afterEntry; f.afterEntry = null; if (then) then(f);
+  }
 }
-function startWork(f, s) { f.state = 'working'; f.act = s.act; f.timer = s.dur; if (s.tool === 'Task') spawnCub(f); }
+function startWork(f, s) { f.state = 'working'; f.act = s.act; f.timer = s.dur; if (s.tool === 'Task' && !f.live) spawnCub(f); }
 function fail(f) { f.qErrors++; f.state = 'stumble'; f.timer = 1.2; f.cur = { k: 'stumbled' }; f.target = null; burst(f, 'smoke', 10); }
 function timerDone(f) {
   const s = f.cur;
@@ -519,9 +556,12 @@ function timerDone(f) {
   if (f.state !== 'sleeping') { f.state = 'idle'; f.act = null; }
 }
 function advance(f) { const s = f.steps.shift(); if (s) begin(f, s); else if (!f.isCub) begin(f, { k: 'rest' }); }
+function makeCub(p, x, y) {
+  return makeFox({ name: p.name, source: p.source, model: p.model, fur: p.fur, arctic: p.arctic, isCub: true, parent: p,
+    quest: p.quest, scale: 0.6, speed: 3.3, x, y, machine: p.machine }, p.den);
+}
 function spawnCub(p) {
-  const c = makeFox({ name: p.name, source: p.source, model: p.model, fur: p.fur, arctic: p.arctic, isCub: true, parent: p,
-    quest: p.quest, scale: 0.6, speed: 3.3, x: 9.25, y: 6.75, machine: p.machine }, p.den);
+  const c = makeCub(p, HOLE_X, 0.3);
   c.steps = [{ k: 'tool', tool: 'Read', target: p.quest.files[1] }, { k: 'tool', tool: 'Grep', target: p.quest.grep }, { k: 'tool', tool: 'Bash', target: 'ls ' + dir(p.quest.files[1]) }, { k: 'home' }];
   c.timer = 0.6; c.cur = { k: 'boot' };
   p.den.foxes.push(c); burst(c, 'smoke', 6);
@@ -540,7 +580,7 @@ function addXp(n, f) {
   xp += n;
   const [sx, sy] = wpos(f);
   f.den.parts.push({ kind: 'xp', x: sx, y: sy - 70, vx: 0, vy: -26, life: 2.2, max: 2.2, text: `+${n} XP` });
-  while (xp >= xpNeed(level)) { xp -= xpNeed(level); level++; trophies = Math.min(6, trophies + 1); toast(`Level ${level}`, 'A new trophy went into the Commons cabinet.'); }
+  while (xp >= xpNeed(level)) { xp -= xpNeed(level); level++; toast(`Level ${level}`, 'Your HQ levelled up.'); }
 }
 function burst(f, kind, n) {
   const [sx, sy] = wpos(f), colors = [COL.fox, COL.alert, COL.ok, '#8fc4ff', '#f3a0c4'];
@@ -564,6 +604,8 @@ function tick(dt) {
         } else { f.x += dx / dist * step; f.y += dy / dist * step; }
         continue;
       }
+      if (f.state === 'diving') { f.dive += dt; if (f.dive >= DIVE_T) popOut(f); continue; }
+      if (f.live) { liveTick(f, dt); continue; }
       if (f.state === 'waiting') { if (simT - f.waitSince > 25) decide(f, true); continue; }
       if (f.timer > 0) { f.timer -= dt; if (f.timer <= 0) timerDone(f); continue; }
       if (!f.cur) advance(f);
@@ -575,7 +617,31 @@ function tick(dt) {
       if (p.life <= 0) d.parts.splice(i, 1);
     }
   }
+  layoutRooms(dt);
 }
+const easeOutBack = t => 1 + 2.7 * (t - 1) ** 3 + 1.7 * (t - 1) ** 2;
+// Opens a room as soon as one of its foxes is awake and closes it once they all sleep and nothing has happened
+// there for ROOM_IDLE; packs open rooms left to right. Live rooms measure from their last event, demo rooms
+// from when the last fox fell asleep.
+function idleFor(d) {
+  if (!LIVE) return d.quiet;
+  const last = Math.max(0, ...d.foxes.map(f => f.lastAt || 0));
+  return (Date.now() - last) / 1000;
+}
+function layoutRooms(dt) {
+  let x = 0;
+  for (const d of DENS) {
+    const active = d.foxes.some(f => !f.isCub && f.state !== 'sleeping');
+    d.quiet = active ? 0 : d.quiet + dt;
+    const open = active || idleFor(d) < ROOM_IDLE;
+    if (open !== d.open) { d.open = open; burst({ den: d, x: ROOM_W / 2, y: BH / 2 }, 'smoke', 16); }
+    d.t = Math.min(1, Math.max(0, d.t + (open ? dt : -dt) / ROOM_ANIM));
+    d.grow = open ? easeOutBack(d.t) : d.t ** 3;
+    d.ox = x; x += ROOM_W * d.grow;
+  }
+  BW = x;
+}
+const openDens = () => DENS.filter(d => d.grow > 0.01);
 
 /* ---------- drawing: building shell ---------- */
 function windowOnBack(x0, x1, t) {
@@ -588,21 +654,48 @@ function windowOnBack(x0, x1, t) {
   const mid = (x0 + x1) / 2; line(iso(mid, 0, z0), iso(mid, 0, z1), P.base, 2); line(iso(x0, 0, 58), iso(x1, 0, 58), P.base, 2);
   box(x0 - 0.1, 0, x1 - x0 + 0.2, 0.16, 3, 31, B(P.shelf));
 }
-function windowOnLeft(y0, y1, t) {
-  const h = new Date().getHours(), night = h < 6 || h >= 20;
-  const z0 = 34, z1 = 82, pts = [iso(0, y0, z0), iso(0, y1, z0), iso(0, y1, z1), iso(0, y0, z1)];
-  poly(pts, night ? '#1b2a4d' : '#8cc6e6');
-  if (night) stars.forEach(([u, sz, ph]) => { const p = iso(0, y0 + 0.1 + u * (y1 - y0 - 0.2), sz); ctx.fillStyle = `rgba(255,248,220,${0.45 + 0.45 * Math.sin(t * 1.5 + ph)})`; ctx.fillRect(p[0], p[1], 1.6, 1.6); });
-  ctx.strokeStyle = P.base; ctx.lineWidth = 3; ctx.beginPath(); pts.forEach((p, i) => i ? ctx.lineTo(...p) : ctx.moveTo(...p)); ctx.closePath(); ctx.stroke();
-  const mid = (y0 + y1) / 2; line(iso(0, mid, z0), iso(0, mid, z1), P.base, 2); line(iso(0, y0, 58), iso(0, y1, 58), P.base, 2);
+const SOIL_DEPTH = -12;
+// a cut face of the lawn: soil from below the floor up to the grass, with a grass lip and a few strata lines
+function soilFace(a, b) {
+  poly([iso(...a, SOIL_DEPTH), iso(...b, SOIL_DEPTH), iso(...b, WH), iso(...a, WH)], P.soil);
+  [22, 47, 71].forEach(z => line(iso(...a, z), iso(...b, z), P.strata, 1.5));
+  poly([iso(...a, WH - 7), iso(...b, WH - 7), iso(...b, WH), iso(...a, WH)], P.lip);
+}
+// a lawn tile, cut to [x0,x1] so the lawn can grow smoothly with the basement; some tiles get a tuft
+function lawnTile(i, j, x0, x1) {
+  poly([iso(x0, j, WH), iso(x1, j, WH), iso(x1, j + 1, WH), iso(x0, j + 1, WH)], (i + j) % 2 ? P.grassA : P.grassB);
+  const r = ((i * 73856093) ^ (j * 19349663)) >>> 0;
+  if (r % 3 || x1 - x0 < 0.6) return;
+  const u = x0 + 0.2 + (r % 7) / 10 * (x1 - x0 - 0.3), v = j + 0.25 + (r % 5) / 10;
+  [-0.08, 0, 0.08].forEach((d, k) => line(iso(u + d, v, WH), iso(u + d * 1.6, v - 0.05, WH + 6 + (k % 2) * 3), P.blade, 1.4));
+}
+// The lawn wraps the basement's back and left sides at wall-top height. Its front and right ends are cut away
+// so you look into the basement from the front, like a cross-section of the ground.
+function drawLawn() {
+  OFF = [0, 0];
+  const xEnd = BW + LAWN;
+  soilFace([xEnd, -LAWN], [xEnd, 0]);
+  soilFace([BW, 0], [xEnd, 0]);
+  soilFace([-LAWN, BH], [0, BH]);
+  soilFace([0, 0], [0, BH]); // hidden behind the left wall whenever a room is open
+  for (let j = -LAWN; j < BH; j++) {
+    const right = j < 0 ? xEnd : 0;
+    for (let i = -LAWN; i < right; i++) lawnTile(i, j, i, Math.min(i + 1, right));
+  }
+  openDens().forEach(d => {
+    ctx.globalAlpha = Math.min(1, d.grow);
+    const c = iso(d.ox + HOLE_X, GRASS_HOLE_Y, WH);
+    ell(c[0], c[1], 30, 14, P.dirt); ell(c[0], c[1] + 1, 19, 8, P.hole);
+    ctx.globalAlpha = 1;
+  });
 }
 function drawShell(t) {
   OFF = [0, 0];
-  // slab edge so the floor reads as one building
-  poly([iso(0, BH), iso(BW, BH), iso(BW, BH, -12), iso(0, BH, -12)], '#241a14');
-  poly([iso(BW, 0), iso(BW, BH), iso(BW, BH, -12), iso(BW, 0, -12)], '#1c1410');
-  for (let i = 0; i < BW; i++) for (let j = 0; j < BH; j++)
-    poly([iso(i, j), iso(i + 1, j), iso(i + 1, j + 1), iso(i, j + 1)], (i + j) % 2 ? P.hallA : P.hallB);
+  if (BW < 0.01) return;
+  // the floor slab's cut edges
+  poly([iso(0, BH), iso(BW, BH), iso(BW, BH, SOIL_DEPTH), iso(0, BH, SOIL_DEPTH)], '#241a14');
+  poly([iso(BW, 0), iso(BW, BH), iso(BW, BH, SOIL_DEPTH), iso(BW, 0, SOIL_DEPTH)], '#1c1410');
+  poly([iso(0, 0), iso(BW, 0), iso(BW, BH), iso(0, BH)], P.hallA);
   poly([iso(0, 0), iso(BW, 0), iso(BW, 0, WH), iso(0, 0, WH)], P.wallR);
   poly([iso(0, 0), iso(0, BH), iso(0, BH, WH), iso(0, 0, WH)], P.wallL);
   for (let x = 1; x < BW; x++) line(iso(x, 0), iso(x, 0, WH), 'rgba(0,0,0,.13)');
@@ -611,11 +704,17 @@ function drawShell(t) {
   poly([iso(0, 0), iso(0, BH), iso(0, BH, 6), iso(0, 0, 6)], P.base);
   ctx.lineJoin = 'round'; ctx.strokeStyle = P.base; ctx.lineWidth = 4; ctx.beginPath();
   ctx.moveTo(...iso(0, BH, WH)); ctx.lineTo(...iso(0, 0, WH)); ctx.lineTo(...iso(BW, 0, WH)); ctx.stroke();
-  windowOnBack(8.4, 10.2, t); windowOnBack(21.4, 23.2, t); windowOnBack(11.3, 12.7, t);
-  windowOnLeft(11.8, 13.6, t); windowOnLeft(9.2, 10.8, t);
-  // corridor runner
-  poly([iso(11.2, 0.4), iso(12.8, 0.4), iso(12.8, 19.6), iso(11.2, 19.6)], '#3a332d');
-  poly([iso(0.4, 9.2), iso(23.6, 9.2), iso(23.6, 10.8), iso(0.4, 10.8)], '#3a332d');
+  openDens().forEach(d => { if (d.grow > 0.9) windowOnBack(d.ox + 8.4, d.ox + 10.2, t); });
+}
+// the room's way in and out: an arched hole in the back wall, below its grass hole
+function drawWallHole() {
+  const r = 0.42, spring = 20, pts = [iso(HOLE_X - r, 0.01, 0)];
+  for (let k = 0; k <= 8; k++) { const a = Math.PI - k * Math.PI / 8; pts.push(iso(HOLE_X + r * Math.cos(a), 0.01, spring + 14 * Math.sin(a))); }
+  pts.push(iso(HOLE_X + r, 0.01, 0));
+  ctx.lineJoin = 'round'; ctx.strokeStyle = P.dirt; ctx.lineWidth = 6;
+  ctx.beginPath(); pts.forEach((p, i) => i ? ctx.lineTo(...p) : ctx.moveTo(...p)); ctx.closePath(); ctx.stroke();
+  poly(pts, P.hole);
+  const m = iso(HOLE_X, 0.35); ell(m[0], m[1], 22, 7, 'rgba(86,57,42,.75)');
 }
 
 /* ---------- drawing: one department room (local coords, OFF = room origin) ---------- */
@@ -634,7 +733,7 @@ function drawRoom(d, t) {
     poly([iso(x + 0.12, y + 0.12), iso(x + BAW - 0.12, y + 0.12), iso(x + BAW - 0.12, y + BAH - 0.12), iso(x + 0.12, y + BAH - 0.12)], rB);
     poly([iso(x + 0.24, y + 0.24), iso(x + BAW - 0.24, y + 0.24), iso(x + BAW - 0.24, y + BAH - 0.24), iso(x + 0.24, y + BAH - 0.24)], rA);
   });
-  const bc = iso(9.9, 6.9); ell(bc[0], bc[1], 40, 20, P.dirt); ell(bc[0], bc[1] + 1, 26, 12, P.hole);
+  drawWallHole();
   [0, 1, 2, 3].forEach(k => { const b = ST.bed(k), c = iso(b.x, b.y); ell(c[0], c[1] + 2, 30, 15, P.cush); ell(c[0], c[1], 22, 10, P.cushIn); });
   d.foxes.filter(f => f.state === 'waiting').forEach(f => {
     const [sx, sy] = iso(f.x, f.y), g = ctx.createLinearGradient(0, sy, 0, sy - 260), a = 0.22 + 0.08 * Math.sin(t * 4);
@@ -655,7 +754,7 @@ function drawBoard(d) {
 }
 function drawDesk(owner, t) {
   const { x: dx, y: dy } = deskRect(owner), k = owner.bDesk;
-  const on = owner.state === 'working' && owner.act === 'type' && !owner.travel;
+  const on = owner.state === 'working' && (owner.act === 'type' || owner.act === 'think') && !owner.travel;
   box(dx, dy, DW, DD, 22, 0, B(P.desk));
   poly([iso(dx + 0.1, dy + DD + 0.01, 8), iso(dx + 0.45, dy + DD + 0.01, 8), iso(dx + 0.45, dy + DD + 0.01, 15), iso(dx + 0.1, dy + DD + 0.01, 15)], owner.fur);
   box(dx + 0.42, dy + 0.1, 0.16, 0.12, 4, 22, B(P.mon));
@@ -699,50 +798,35 @@ function drawPlant(x = 10.3, y = 0.25) {
   [[-8, -8, 9], [7, -10, 8], [0, -18, 10], [-4, -26, 7], [6, -24, 6]].forEach(([dx, dy, r], i) => ell(c[0] + dx, c[1] + dy, r, r * 0.8, i % 2 ? P.leaf : tone(P.leaf, 0.8)));
 }
 
-/* ---------- the Commons: trophy cabinet, a status board for every department, couches ---------- */
-function drawLobby(t) {
-  OFF = [LOBBY.ox, LOBBY.oy];
-  for (let i = 0; i < COLS; i++) for (let j = 0; j < ROWS; j++)
-    poly([iso(i, j), iso(i + 1, j), iso(i + 1, j + 1), iso(i, j + 1)], (i + j) % 2 ? P.lobby : P.lobbyB);
-  partitions(LOBBY);
-  poly([iso(3.5, 3.6), iso(8.5, 3.6), iso(8.5, 7.2), iso(3.5, 7.2)], '#2f4f55');
-  poly([iso(3.7, 3.8), iso(8.3, 3.8), iso(8.3, 7.0), iso(3.7, 7.0)], '#3c6168');
-  const items = [];
-  items.push({ d: 1.2, fn: () => {
-    box(0.4, 0.3, 2.8, 0.6, 58, 0, B('#5e4330'));
-    poly([iso(0.5, 0.91, 6), iso(3.1, 0.91, 6), iso(3.1, 0.91, 54), iso(0.5, 0.91, 54)], 'rgba(160,210,220,.18)');
-    for (let i = 0; i < trophies; i++) {
-      const p = iso(0.8 + (i % 3) * 0.85, 0.9, i < 3 ? 40 : 18);
-      ctx.fillStyle = P.gold; ctx.fillRect(p[0] - 4, p[1] - 2, 8, 2); ctx.fillRect(p[0] - 1, p[1] - 6, 2, 4);
-      ctx.beginPath(); ctx.moveTo(p[0] - 5, p[1] - 12); ctx.lineTo(p[0] + 5, p[1] - 12); ctx.quadraticCurveTo(p[0] + 4, p[1] - 5, p[0], p[1] - 6); ctx.quadraticCurveTo(p[0] - 4, p[1] - 5, p[0] - 5, p[1] - 12); ctx.fill();
-    }
-  } });
-  items.push({ d: 6.5, fn: () => {
-    // status board: one row per department, a light per fox
-    box(5.6, 0.2, 3.6, 0.18, 46, 12, B('#20272b'));
-    box(7.3, 0.25, 0.2, 0.1, 12, 0, B('#20272b'));
-    const fy = 0.385;
-    poly([iso(5.7, fy, 16), iso(9.1, fy, 16), iso(9.1, fy, 54), iso(5.7, fy, 54)], '#0f1c22');
-    DENS.forEach((d, r) => {
-      const z = 49 - r * 12, need = d.foxes.some(f => f.state === 'waiting');
-      poly([iso(5.8, fy + 0.002, z), iso(6.0, fy + 0.002, z), iso(6.0, fy + 0.002, z - 8), iso(5.8, fy + 0.002, z - 8)], d.rug[1]);
-      d.foxes.filter(f => !f.isCub).forEach((f, i) => {
-        const x = 6.15 + i * 0.3, c = f.state === 'waiting' ? (Math.sin(t * 6) > 0 ? COL.alert : '#7a5a1a') : f.state === 'sleeping' ? '#3b4a44' : COL.ok;
-        poly([iso(x, fy + 0.002, z - 1), iso(x + 0.2, fy + 0.002, z - 1), iso(x + 0.2, fy + 0.002, z - 7), iso(x, fy + 0.002, z - 7)], c);
-      });
-      if (need) line(iso(5.75, fy + 0.003, z + 1), iso(9.05, fy + 0.003, z + 1), COL.alert, 1);
-    });
-  } });
-  items.push({ d: 9.2, fn: () => { box(4.2, 4.0, 2.6, 0.9, 10, 0, B(P.couch)); box(4.2, 4.0, 2.6, 0.25, 22, 0, B(P.couch)); } });
-  items.push({ d: 12.0, fn: () => { box(5.0, 5.6, 1.6, 0.8, 9, 0, B('#7b5337')); const c = iso(5.6, 6.0, 9); ctx.fillStyle = '#e8e0d0'; ctx.fillRect(c[0] - 3, c[1] - 5, 6, 5); } });
-  items.push({ d: 10.6, fn: () => { box(7.6, 4.3, 0.9, 2.2, 10, 0, B(P.couch)); box(8.25, 4.3, 0.25, 2.2, 22, 0, B(P.couch)); } });
-  items.push({ d: 1.0, fn: () => drawPlant(0.2, 8.2) }, { d: 10.6, fn: () => drawPlant(10.2, 0.3) }, { d: 18.4, fn: () => drawPlant(10.2, 8.2) });
-  items.push({ d: 3.0, fn: () => { box(0.3, 4.2, 0.8, 2.0, 30, 0, B('#5e4330')); const c = iso(0.9, 5.0, 30); ctx.fillStyle = '#2b2b2b'; ctx.fillRect(c[0] - 6, c[1] - 12, 12, 12); ctx.fillStyle = '#e8e0d0'; ctx.fillRect(c[0] + 8, c[1] - 6, 4, 5); } });
-  items.sort((a, b) => a.d - b.d).forEach(i => i.fn());
+const HOP_HEIGHT = 26;
+// 0→1 through a tap's jump-and-spin, or null when the fox isn't hopping
+function hopOf(f) {
+  if (f.hopAt == null) return null;
+  const k = (performance.now() / 1000 - f.hopAt) / HOP_T;
+  if (k >= 1) { f.hopAt = null; return null; }
+  return k;
 }
-
 function drawFox(f, t) {
-  const [sx, sy] = iso(f.x, f.y), ph = t + f.phase, p = PX * (f.isCub ? 0.85 : 1);
+  const [sx, sy] = iso(f.x, f.y, f.z || 0), hop = hopOf(f);
+  if (hop == null && f.state !== 'diving') return drawFoxBody(f, t);
+  ctx.save();
+  if (f.state === 'diving') {
+    // sink below the rim of the grass hole: clip at the hole and slide the fox down through it
+    ctx.beginPath(); ctx.rect(sx - 60, sy - 120, 120, 121); ctx.clip();
+    ctx.translate(0, Math.min(1, f.dive / DIVE_T) * 44);
+  }
+  if (hop != null) {
+    const lift = Math.sin(hop * Math.PI) * (reduceMotion ? 6 : HOP_HEIGHT);
+    ctx.translate(sx, sy - lift);
+    if (!reduceMotion) ctx.scale(Math.cos(hop * TAU), 1); // one full turn, seen side-on
+    ctx.translate(-sx, -sy);
+    drawFoxBody(f, t);
+    f.headTop -= lift;
+  } else drawFoxBody(f, t);
+  ctx.restore();
+}
+function drawFoxBody(f, t) {
+  const [sx, sy] = iso(f.x, f.y, f.z || 0), ph = t + f.phase, p = PX * (f.isCub ? 0.85 : 1);
   const pal = { o: f.fur, d: f.shade, c: f.cream, k: INK };
   ell(sx, sy, (f.isCub ? 9 : 15), (f.isCub ? 3.5 : 5.5), 'rgba(0,0,0,.28)');
   if (f === selected) { ctx.strokeStyle = COL.fox; ctx.lineWidth = 2; ctx.beginPath(); ctx.ellipse(sx, sy, 21, 8.5, 0, 0, TAU); ctx.stroke(); }
@@ -783,6 +867,8 @@ function statusOf(f) {
   if (f.state === 'waiting') return ['needs you', 'wait'];
   if (f.state === 'celebrating') return ['quest done', 'done'];
   if (f.state === 'stumble') return ['tool error', 'err'];
+  if (f.state === 'diving' || f.entering) return ['moving in', 'idle'];
+  if (f.state === 'working' && f.act === 'think') return ['thinking', 'busy'];
   const c = f.cur;
   if (c && c.k === 'tool') return [`${c.tool} ${short(c.target)}`, 'busy'];
   if (c && c.k === 'prompt') return ['new quest', 'busy'];
@@ -793,7 +879,8 @@ function statusOf(f) {
 const PILL = { busy: COL.ok, wait: COL.alert, done: COL.fox, err: COL.err, sleep: COL.muted, idle: COL.muted };
 const placed = [];
 function drawLabel(f) {
-  const [sx, sy] = iso(f.x, f.y), [txt, kind] = statusOf(f);
+  if (f.state === 'diving') return;
+  const [sx, sy] = iso(f.x, f.y, f.z || 0), [txt, kind] = statusOf(f);
   let y = (f.headTop ?? sy - 40) - 4;
   ctx.font = `600 ${f.isCub ? 10 : 12}px ${FONT}`;
   const name = f.isCub ? 'cub' : f.name, nw = ctx.measureText(name).width;
@@ -824,17 +911,27 @@ function drawParts(d) {
 /* ---------- camera: one continuous floor you can pan and zoom ---------- */
 const cv = document.getElementById('floor');
 ctx = cv.getContext('2d');
-const BOUNDS = { x0: -BH * TW / 2 - 30, x1: BW * TW / 2 + 30, y0: -WH - 70, y1: (BW + BH) * TH / 2 + 30 };
 const cam = { x: 0, y: 0, z: 0.5 }, camT = { x: 0, y: 0, z: 0.5 };
 let scr = { w: 1, h: 1, dpr: 1 }, fitZ = 0.5, roomZ = 1;
+const ZOOM_STEP = 1.35, OVERVIEW_ZOOM_INS = 2;
+// "Whole floor" keeps the camera on the floor as rooms open and close, until you pan, zoom or visit a room
+let followFloor = true;
 function roomCenter(o) { return isoAbs(o.ox + 5.5, o.oy + 4.5, 30); }
+// the box around the basement and its lawn at the floor's current width; an empty lawn still frames one room
+function floorBounds() {
+  const w = Math.max(BW, ROOM_W);
+  const pts = [[-LAWN, -LAWN, WH], [w + LAWN, -LAWN, WH], [w + LAWN, 0, SOIL_DEPTH], [w, BH, SOIL_DEPTH], [-LAWN, BH, SOIL_DEPTH]].map(p => isoAbs(...p));
+  const xs = pts.map(p => p[0]), ys = pts.map(p => p[1]);
+  return { x0: Math.min(...xs) - 30, x1: Math.max(...xs) + 30, y0: Math.min(...ys) - 60, y1: Math.max(...ys) + 30 };
+}
+function fitFloor() { const b = floorBounds(); fitZ = Math.min(scr.w / (b.x1 - b.x0), (scr.h - 70) / (b.y1 - b.y0)); return b; }
 function resize() {
   const r = cv.getBoundingClientRect(), dpr = Math.min(2, devicePixelRatio || 1);
   if (!r.width) return;
   scr = { w: r.width, h: r.height, dpr };
   cv.width = Math.round(r.width * dpr); cv.height = Math.round(r.height * dpr);
-  fitZ = Math.min(r.width / (BOUNDS.x1 - BOUNDS.x0), (r.height - 70) / (BOUNDS.y1 - BOUNDS.y0));
   roomZ = Math.min(r.width / 760, (r.height - 70) / 520);
+  fitFloor();
 }
 new ResizeObserver(() => { const first = scr.w === 1; resize(); if (first) { overview(true); } }).observe(cv);
 const clampZ = z => Math.max(fitZ * 0.75, Math.min(roomZ * 2.4, z));
@@ -842,10 +939,15 @@ function flyTo(x, y, z, instant) {
   camT.x = x; camT.y = y; camT.z = clampZ(z);
   if (instant || reduceMotion) Object.assign(cam, camT);
 }
-function overview(instant) { flyTo((BOUNDS.x0 + BOUNDS.x1) / 2, (BOUNDS.y0 + BOUNDS.y1) / 2 + 10, fitZ, instant); }
-function visit(o, instant) { const [x, y] = roomCenter(o); flyTo(x, y, roomZ, instant); }
-function visitBranch(d, b) { const a = areaOf(b); flyTo(...isoAbs(d.ox + a.x + BAW / 2, d.oy + a.y + BAH / 2, 20), roomZ * 1.7); }
+function aimAtFloor(instant) {
+  const b = fitFloor();
+  flyTo((b.x0 + b.x1) / 2, (b.y0 + b.y1) / 2 + 10, fitZ * ZOOM_STEP ** OVERVIEW_ZOOM_INS, instant);
+}
+function overview(instant) { followFloor = true; aimAtFloor(instant); }
+function visit(o, instant) { followFloor = false; const [x, y] = roomCenter(o); flyTo(x, y, roomZ, instant); }
+function visitBranch(d, b) { followFloor = false; const a = areaOf(b); flyTo(...isoAbs(d.ox + a.x + BAW / 2, d.oy + a.y + BAH / 2, 20), roomZ * 1.7); }
 function updateView() {
+  if (followFloor) aimAtFloor(false); else fitFloor();
   const k = reduceMotion ? 1 : 0.14;
   cam.x += (camT.x - cam.x) * k; cam.y += (camT.y - cam.y) * k; cam.z += (camT.z - cam.z) * k;
   view = { s: cam.z, ox: scr.w / 2 - cam.x * cam.z, oy: scr.h / 2 + 20 - cam.y * cam.z, dpr: scr.dpr };
@@ -856,30 +958,39 @@ function focusRoom() {
   // the department the camera is centred on, once zoomed in enough to be "in" it
   if (cam.z < roomZ * 0.6) return null;
   let best = null, bd = Infinity;
-  [...DENS, LOBBY].forEach(o => { const [x, y] = roomCenter(o), dd = Math.hypot(x - cam.x, y - cam.y); if (dd < bd) { bd = dd; best = o; } });
+  openDens().forEach(o => { const [x, y] = roomCenter(o), dd = Math.hypot(x - cam.x, y - cam.y); if (dd < bd) { bd = dd; best = o; } });
   return bd < 360 ? best : null;
 }
 
 let signs = [];
+function drawQuietSign() {
+  const text = 'All quiet · a room opens when a session starts', [x, y] = toScreen(...isoAbs(ROOM_W / 2, BH / 2, 0));
+  ctx.font = `600 12px ${FONT}`;
+  const w = ctx.measureText(text).width + 28, h = 30;
+  ctx.fillStyle = 'rgba(14,21,19,.9)'; rrect(x - w / 2, y - h / 2, w, h, 8); ctx.fill();
+  ctx.strokeStyle = 'rgba(255,255,255,.12)'; ctx.lineWidth = 1; ctx.stroke();
+  ctx.fillStyle = COL.muted; ctx.fillText(text, x - w / 2 + 14, y + 0.5);
+}
 function drawSigns() {
   // department signs float above each room; branch tags sit at the front of their rugs and step aside so nothing overlaps
   signs = [];
   ctx.setTransform(scr.dpr, 0, 0, scr.dpr, 0, 0);
   ctx.textBaseline = 'middle';
-  const depts = [...DENS, LOBBY].map(o => {
-    const isDen = !!o.foxes;
-    const [x, y] = toScreen(...isoAbs(o.ox + 5.5, o.oy + 0.2, isDen ? 128 : 90));
-    const need = isDen ? o.foxes.filter(f => f.state === 'waiting').length : 0;
-    const awake = isDen ? o.foxes.filter(f => !f.isCub && f.state !== 'sleeping').length : 0;
-    const state = !isDen ? 'shared space' : need ? `${need} needs you` : awake ? `${awake} awake` : 'all asleep';
+  const shown = openDens().filter(d => d.grow > 0.6);
+  if (!shown.length) return drawQuietSign();
+  const depts = shown.map(o => {
+    const [x, y] = toScreen(...isoAbs(o.ox + 5.5, o.oy + 0.2, 128));
+    const need = o.foxes.filter(f => f.state === 'waiting').length;
+    const awake = o.foxes.filter(f => !f.isCub && f.state !== 'sleeping').length;
+    const state = need ? `${need} needs you` : awake ? `${awake} awake` : 'all asleep';
     ctx.font = `600 13px ${MONO}`; const nw = ctx.measureText(o.name).width;
     ctx.font = `600 11px ${FONT}`; const sw = ctx.measureText(state).width;
     const w = nw + sw + 44, h = 28;
-    return { o, isDen, need, awake, state, nw, x: x - w / 2, y: y - h / 2, w, h };
+    return { o, need, awake, state, nw, x: x - w / 2, y: y - h / 2, w, h };
   });
   const taken = depts.map(r => ({ ...r }));
   const hit = (a, b) => a.x < b.x + b.w + 4 && b.x < a.x + a.w + 4 && a.y < b.y + b.h + 3 && b.y < a.y + a.h + 3;
-  DENS.forEach(d => d.branches.forEach(b => {
+  shown.forEach(d => d.branches.forEach(b => {
     const a = areaOf(b), [x, y] = toScreen(...isoAbs(d.ox + a.x + BAW / 2, d.oy + a.y + BAH + 0.1, 0));
     const wait = b.foxes.some(f => f.state === 'waiting'), text = '⎇ ' + b.name;
     ctx.font = `600 10.5px ${MONO}`;
@@ -891,10 +1002,10 @@ function drawSigns() {
     ctx.fillStyle = wait ? COL.alert : COL.fg; ctx.fillText(text, r.x + 8, r.y + r.h / 2 + 0.5);
     signs.push({ d, b, ...r });
   }));
-  depts.forEach(({ o, isDen, need, awake, state, nw, x: bx, y: by, w, h }) => {
+  depts.forEach(({ o, need, awake, state, nw, x: bx, y: by, w, h }) => {
     ctx.fillStyle = need ? 'rgba(48,38,12,.94)' : 'rgba(14,21,19,.9)'; rrect(bx, by, w, h, 8); ctx.fill();
     ctx.strokeStyle = need ? COL.alert : 'rgba(255,255,255,.12)'; ctx.lineWidth = 1; ctx.stroke();
-    ctx.fillStyle = isDen ? o.rug[1] : '#3c6168'; rrect(bx + 10, by + 9, 10, 10, 3); ctx.fill();
+    ctx.fillStyle = o.rug[1]; rrect(bx + 10, by + 9, 10, 10, 3); ctx.fill();
     ctx.fillStyle = COL.fg; ctx.font = `600 13px ${MONO}`; ctx.fillText(o.name, bx + 28, by + h / 2 + 0.5);
     ctx.fillStyle = need ? COL.alert : awake ? COL.ok : COL.muted; ctx.font = `600 11px ${FONT}`; ctx.fillText(state, bx + 36 + nw, by + h / 2 + 0.5);
     signs.push({ o, x: bx, y: by, w, h });
@@ -906,26 +1017,36 @@ function render(t) {
   ctx.clearRect(0, 0, cv.width, cv.height);
   ctx.setTransform(scr.dpr * view.s, 0, 0, scr.dpr * view.s, scr.dpr * view.ox, scr.dpr * view.oy);
   ctx.lineCap = 'butt';
+  drawLawn();
   drawShell(t);
-  // rooms back to front: billing (left), acme/web (top), foxhole (right), then the Commons (front)
-  const rooms = [...DENS.map(d => ({ o: d, k: d.ox + d.oy, fn: () => drawDen(d, t) })), { o: LOBBY, k: LOBBY.ox + LOBBY.oy, fn: () => drawLobby(t) }];
-  rooms.sort((a, b) => a.k - b.k).forEach(r => r.fn());
+  const open = openDens();
+  open.forEach(d => drawDen(d, t)); // left to right is back to front along the back wall
   OFF = [0, 0];
   ctx.globalCompositeOperation = 'lighter';
-  const c = isoAbs(12, 10, 40), g = ctx.createRadialGradient(c[0], c[1], 10, c[0], c[1], 700);
+  const c = isoAbs(BW / 2, BH / 2, 40), g = ctx.createRadialGradient(c[0], c[1], 10, c[0], c[1], 700);
   g.addColorStop(0, 'rgba(255,170,80,.08)'); g.addColorStop(1, 'rgba(255,170,80,0)');
   ctx.fillStyle = g; ctx.fillRect(c[0] - 700, c[1] - 700, 1400, 1400);
   ctx.globalCompositeOperation = 'source-over';
   if (view.s > roomZ * 0.55) {
     placed.length = 0;
-    DENS.forEach(d => { OFF = [d.ox, d.oy]; [...d.foxes].sort((a, b) => (b.x + b.y) - (a.x + a.y)).forEach(drawLabel); });
+    open.filter(d => d.grow > 0.95).forEach(d => { OFF = [d.ox, d.oy]; [...d.foxes].sort((a, b) => (b.x + b.y) - (a.x + a.y)).forEach(drawLabel); });
   }
   OFF = [0, 0];
   DENS.forEach(drawParts);
   drawSigns();
 }
+const ROOM_DROP = 140; // how far above the floor a room's contents start when it opens
 function drawDen(d, t) {
   OFF = [d.ox, d.oy];
+  // while opening, the room's furniture and foxes drop into the widening basement and fade in; closing reverses it
+  const k = Math.min(1, d.grow);
+  ctx.save();
+  ctx.globalAlpha = k;
+  ctx.translate(0, -(1 - k) * ROOM_DROP);
+  drawDenContents(d, t);
+  ctx.restore();
+}
+function drawDenContents(d, t) {
   drawRoom(d, t);
   const items = [];
   d.foxes.filter(f => !f.isCub).forEach(f => { const r = deskRect(f); items.push({ d: r.x + DW / 2 + r.y + DD / 2, fn: () => drawDesk(f, t) }); });
@@ -946,7 +1067,7 @@ cv.addEventListener('pointermove', e => {
     const now = pinchState(); zoomAt(drag.pinch.mid[0], drag.pinch.mid[1], drag.pinch.z * now.d / drag.pinch.d, true); drag.moved += 10; return;
   }
   drag.moved += Math.abs(dx) + Math.abs(dy);
-  if (drag.moved > 4) { cv.classList.add('dragging'); camT.x -= dx / cam.z; camT.y -= dy / cam.z; cam.x = camT.x; cam.y = camT.y; }
+  if (drag.moved > 4) { followFloor = false; cv.classList.add('dragging'); camT.x -= dx / cam.z; camT.y -= dy / cam.z; cam.x = camT.x; cam.y = camT.y; }
 });
 function endPointer(e) {
   if (!pts.has(e.pointerId)) return;
@@ -957,7 +1078,7 @@ function endPointer(e) {
 cv.addEventListener('pointerup', endPointer); cv.addEventListener('pointercancel', endPointer);
 function zoomAt(px, py, z, instant) {
   const [wx, wy] = toWorld(px, py), nz = clampZ(z);
-  camT.z = nz; camT.x = wx - (px - scr.w / 2) / nz; camT.y = wy - (py - scr.h / 2 - 20) / nz;
+  followFloor = false; camT.z = nz; camT.x = wx - (px - scr.w / 2) / nz; camT.y = wy - (py - scr.h / 2 - 20) / nz;
   if (instant) Object.assign(cam, camT);
 }
 cv.addEventListener('wheel', e => { e.preventDefault(); zoomAt(e.offsetX, e.offsetY, camT.z * Math.exp(-e.deltaY * 0.0015), true); }, { passive: false });
@@ -967,23 +1088,26 @@ cv.addEventListener('keydown', e => {
   else if (k === 'ArrowUp') camT.y -= step; else if (k === 'ArrowDown') camT.y += step;
   else if (k === '+' || k === '=') camT.z = clampZ(camT.z * 1.25); else if (k === '-') camT.z = clampZ(camT.z / 1.25);
   else return;
-  e.preventDefault();
+  followFloor = false; e.preventDefault();
 });
 function tap(px, py) {
   const sign = [...signs].reverse().find(s => px >= s.x && px <= s.x + s.w && py >= s.y && py <= s.y + s.h);
   if (sign) { if (sign.b) visitBranch(sign.d, sign.b); else visit(sign.o); return; }
   const [wx, wy] = toWorld(px, py);
   let best = null, bd = 30;
-  DENS.forEach(d => d.foxes.forEach(f => { const [sx, sy] = wpos(f), dd = Math.hypot(wx - sx, wy - (sy - 16)); if (dd < bd) { bd = dd; best = f; } }));
-  if (best) { select(best.parent || best); if (cam.z < roomZ * 0.6) visit(best.den); return; }
+  openDens().forEach(d => d.foxes.forEach(f => { const [sx, sy] = wpos(f), dd = Math.hypot(wx - sx, wy - (sy - 16)); if (dd < bd) { bd = dd; best = f; } }));
+  if (best) {
+    best.hopAt = performance.now() / 1000;
+    select(best.parent || best); if (cam.z < roomZ * 0.6) visit(best.den); return;
+  }
   if (cam.z < roomZ * 0.6) {
     // click anywhere on a department's floor to go there
-    const room = [...DENS, LOBBY].find(o => { const lx = (wx / (TW / 2) + wy / (TH / 2)) / 2 - o.ox, ly = (wy / (TH / 2) - wx / (TW / 2)) / 2 - o.oy; return lx >= 0 && lx <= COLS && ly >= 0 && ly <= ROWS; });
+    const room = openDens().find(o => { const lx = (wx / (TW / 2) + wy / (TH / 2)) / 2 - o.ox, ly = (wy / (TH / 2) - wx / (TW / 2)) / 2 - o.oy; return lx >= 0 && lx <= COLS && ly >= 0 && ly <= ROWS; });
     if (room) visit(room);
   }
 }
-document.getElementById('zoom-in').addEventListener('click', () => { camT.z = clampZ(camT.z * 1.35); });
-document.getElementById('zoom-out').addEventListener('click', () => { camT.z = clampZ(camT.z / 1.35); });
+document.getElementById('zoom-in').addEventListener('click', () => { followFloor = false; camT.z = clampZ(camT.z * ZOOM_STEP); });
+document.getElementById('zoom-out').addEventListener('click', () => { followFloor = false; camT.z = clampZ(camT.z / ZOOM_STEP); });
 document.getElementById('overview').addEventListener('click', () => overview());
 
 /* ---------- UI ---------- */
@@ -993,7 +1117,9 @@ const fmtTarget = t => t == null ? '' : hideTargets ? hash(t) : t;
 const short = t => { if (t == null) return ''; if (hideTargets) return hash(t); const b = t.includes('/') && !t.includes(' ') ? t.split('/').pop() : t; return b.length > 18 ? b.slice(0, 17) + '…' : b; };
 const hhmmss = s => s.slice(11, 19);
 const fmtK = n => n >= 1000 ? (n / 1000).toFixed(1) + 'k' : String(n);
-const cost = f => { const [i, o] = RATES[f.model]; return (f.tIn * i + f.tOut * o) / 1e6; };
+// real model ids carry versions (claude-opus-5-5), so match on the family prefix; unknown models cost nothing
+const rateOf = m => RATES[m] || RATES[Object.keys(RATES).find(k => m && m.startsWith(k))] || [0, 0];
+const cost = f => { const [i, o] = rateOf(f.model); return (f.tIn * i + f.tOut * o) / 1e6; };
 const typeClass = ev => ev.type === 'permission.request' ? 'ty-perm' : ev.type === 'session.stop' ? 'ty-stop' : ev.status === 'error' ? 'ty-err' : ev.type.startsWith('session') ? 'ty-sess' : '';
 const awakeOf = d => d.foxes.filter(f => !f.isCub && f.state !== 'sleeping');
 // the department in view comes first, so Approve answers the fox in front of you
@@ -1009,7 +1135,7 @@ function logEvent(f, ev) {
   li.querySelector('.who span').textContent = f.isCub ? `↳ ${f.name} cub` : f.name;
   li.children[3].className = typeClass(ev);
   li.children[3].textContent = ev.type + (ev.status === 'error' ? ' ✕' : '');
-  li.children[4].textContent = ev.tool ? `${ev.tool} ${fmtTarget(ev.target)}` : ev.type === 'session.stop' ? `${fmtK(ev.usage.inputTokens + ev.usage.outputTokens)} tokens` : '';
+  li.children[4].textContent = ev.tool ? `${ev.tool} ${fmtTarget(ev.target)}` : ev.type === 'session.stop' && ev.usage ? `${fmtK(ev.usage.inputTokens + ev.usage.outputTokens)} tokens` : '';
   li.addEventListener('click', () => { const o = f.parent || f; select(o); visit(o.den); showJson(ev); });
   logEl.prepend(li);
   while (logEl.children.length > 160) logEl.lastChild.remove();
@@ -1091,6 +1217,7 @@ function renderDetail() {
 function renderDepts() {
   const fr = focusRoom();
   deptEls.forEach((el, d) => {
+    el.hidden = !d.open;
     const wait = d.foxes.filter(f => f.state === 'waiting').length, awake = awakeOf(d).length, all = d.foxes.filter(f => !f.isCub);
     el.classList.toggle('need', wait > 0);
     el.setAttribute('aria-current', String(fr === d));
@@ -1107,9 +1234,11 @@ function renderDepts() {
   });
   const where = $('where');
   if (fr) {
-    const isDen = !!fr.foxes;
-    where.textContent = isDen ? `You're in ${fr.name} · ${fr.branches.length} branch${fr.branches.length > 1 ? 'es' : ''} · ${awakeOf(fr).length} awake` : 'You’re in the Commons · status board and trophies';
-  } else where.textContent = `Whole floor · ${DENS.length} departments · ${DENS.reduce((a, d) => a + awakeOf(d).length, 0)} foxes awake`;
+    where.textContent = `You're in ${fr.name} · ${fr.branches.length} branch${fr.branches.length > 1 ? 'es' : ''} · ${awakeOf(fr).length} awake`;
+  } else {
+    const open = DENS.filter(d => d.open);
+    where.textContent = `Whole floor · ${open.length} active department${open.length === 1 ? '' : 's'} · ${open.reduce((a, d) => a + awakeOf(d).length, 0)} foxes awake`;
+  }
 }
 function renderAlert() {
   const waiting = waitingAll(), el = $('alert');
@@ -1117,14 +1246,15 @@ function renderAlert() {
   const f = waiting[0], s = f.cur, left = Math.max(0, Math.ceil(25 - (simT - f.waitSince)));
   el.className = 'alert on'; $('alert-icon').textContent = '!';
   $('alert-title').textContent = `${f.name} in ${f.den.name} · ${f.branch} needs you` + (waiting.length > 1 ? ` (+${waiting.length - 1} more)` : '');
-  $('alert-sub').textContent = `${s.tool} wants to run: ${fmtTarget(s.target)} · demo auto-approves in ${left}s`;
+  $('alert-sub').textContent = LIVE ? `Answer the prompt in your terminal · waiting ${Math.floor(simT - f.waitSince)}s`
+    : `${s.tool} wants to run: ${fmtTarget(s.target)} · demo auto-approves in ${left}s`;
   $('go-den').hidden = focusRoom() === f.den;
 }
 function renderUi() {
   $('lvl').textContent = 'Lv ' + level;
   $('xpbar').style.width = (xp / xpNeed(level) * 100).toFixed(1) + '%';
   $('xptext').textContent = `${xp} / ${xpNeed(level)} XP`;
-  renderAlert(); renderDepts(); renderDetail();
+  renderAlert(); renderDepts(); renderDetail(); renderHq();
 }
 $('approve').addEventListener('click', () => { const f = waitingAll()[0]; if (f) decide(f, true); });
 $('deny').addEventListener('click', () => { const f = waitingAll()[0]; if (f) decide(f, false); });
@@ -1135,9 +1265,192 @@ $('go-den').addEventListener('click', () => { const f = waitingAll()[0]; if (f) 
 }));
 $('hide-targets').addEventListener('change', e => { hideTargets = e.target.checked; if (jsonEv) showJson(jsonEv); lastTimelineKey = ''; renderUi(); });
 
+/* ---------- live mode: real events from `foxhole serve` drive the foxes ----------
+   One fox per session, in its repo's room, at its branch's corner. Between events a fox idles
+   at its desk or wanders the rug; after a quiet spell it curls up in bed. */
+const NAP_AFTER = ROOM_IDLE;    // seconds of silence before an awake fox goes to bed (its room closes behind it)
+const WAIT_HOLD = 60 * 60;      // a raised paw holds this long before we assume it was answered elsewhere
+const THINK_HOLD = 15 * 60;     // an open turn with no events this long is treated as abandoned
+const LINGER = 20;              // seconds a fox keeps at a tool when no tool.end arrives
+const TOOL_TAIL = 2.5;          // seconds it stays at the station once the tool has finished
+const IDLE_BEAT = [10, 22];     // seconds between idle moves (desk ↔ rug)
+const DESKS = 2;                // desks per branch corner; the longest-quiet fox gives up its desk
+const FOX_NAMES = ['Ember', 'Juniper', 'Sage', 'Rusty', 'Moss', 'Pip', 'Fern', 'Hazel', 'Maple', 'Rowan', 'Briar', 'Clove'];
+const FURS = ['#e8772e', '#d9973a', '#c75b28', '#b9562a', '#f0a05f', '#cf6a2c'];
+const liveFoxes = new Map(), appliedIds = new Set();
+const pickFor = (list, key) => list[parseInt(hash(key).slice(2), 16) % list.length];
+// a session keeps the name its id hashes to, unless another fox on the floor already has it
+function nameFor(id) {
+  const taken = new Set([...liveFoxes.values()].map(f => f.name)), start = FOX_NAMES.indexOf(pickFor(FOX_NAMES, id));
+  for (let i = 0; i < FOX_NAMES.length; i++) { const n = FOX_NAMES[(start + i) % FOX_NAMES.length]; if (!taken.has(n)) return n; }
+  return `Fox ${liveFoxes.size + 1}`;
+}
+const ageOf = ev => Math.max(0, (Date.now() - Date.parse(ev.ts)) / 1000);
+
+function liveDen(repo) {
+  const key = repo || 'local';
+  const known = DENS.find(d => d.repo === key);
+  if (known) return known;
+  const d = makeDen(key, DENS.length);
+  DENS.push(d); buildDepts();
+  return d;
+}
+function retire(f) {
+  const br = f.den.branches[f.bIdx];
+  br.foxes = br.foxes.filter(o => o !== f); br.foxes.forEach((o, i) => { o.bDesk = i; });
+  f.den.foxes = f.den.foxes.filter(o => o !== f && o.parent !== f);
+  liveFoxes.delete(f.session); rebuildBlocked(f.den);
+  if (selected === f) selected = null;
+}
+// once through the hole, act on the latest event that arrived on the way in, then head for the desk
+function afterLiveEntry(f) {
+  const ev = f.pending; f.pending = null;
+  if (ev) react(f, ev, false);
+  if (!f.travel && f.state === 'idle') toDesk(f, false);
+}
+function liveFox(ev, instant) {
+  const id = ev.parentSessionId || ev.sessionId;
+  if (liveFoxes.has(id)) return liveFoxes.get(id);
+  if (ev.parentSessionId) return null; // a subagent whose parent session we never saw
+  const d = liveDen(ev.repo); if (!d) return null;
+  const branch = ev.branch || 'no branch', corner = d.branches.find(b => b.name === branch);
+  if (corner && corner.foxes.length >= DESKS) retire(corner.foxes.reduce((a, b) => (a.lastAt <= b.lastAt ? a : b)));
+  const f = addAgent(d, { name: nameFor(id), fur: pickFor(FURS, id), branch, source: ev.source,
+    model: ev.usage?.model || ev.source, live: true, session: id, machine: ev.machineId, lastAt: 0, idleT: 0, beat: rnd(...IDLE_BEAT) });
+  liveFoxes.set(id, f); buildDepts();
+  if (!instant) enterViaHoles(f, afterLiveEntry);
+  if (!selected) select(f);
+  return f;
+}
+
+// moves a fox to a spot: walking normally, or straight there while replaying history
+function goOrPlace(f, sp, instant) {
+  if (!instant) return goTo(f, sp);
+  Object.assign(f, { x: sp.x, y: sp.y, path: [], travel: false, target: sp });
+  if (sp.face) f.dir = sp.face;
+  arrive(f);
+}
+function toDesk(f, instant) { f.cur = { k: 'desk' }; goOrPlace(f, spotFor(f, 'desk'), instant); }
+function nap(f, instant) { f.cur = { k: 'rest' }; goOrPlace(f, spotFor(f, 'bed'), instant); }
+function halt(f, state) { Object.assign(f, { travel: false, path: [], state }); }
+function cubHeadsHome(p) {
+  const c = makeCub(p, p.x, p.y);
+  c.steps = [{ k: 'home' }];
+  p.den.foxes.push(c); burst(c, 'smoke', 6);
+}
+
+// A turn runs from prompt.submit to session.stop. No hook fires while the model thinks between tool calls,
+// so during an open turn a fox with nothing else to do sits at its desk thinking rather than idling.
+const TURN_ENDS = new Set(['session.stop', 'session.waiting', 'session.end']);
+function react(f, ev, instant) {
+  if (ev.type === 'prompt.submit') f.turnOpen = true; else if (TURN_ENDS.has(ev.type)) f.turnOpen = false;
+  if (f.state === 'sleeping') f.timer = 0; // any event wakes it; drop the nap timer so it can act right away
+  if (f.entering) { f.pending = ev; return; } // still on its way in; acts on this once it's through the hole
+  switch (ev.type) {
+    case 'session.start': case 'session.waiting': toDesk(f, instant); break;
+    case 'prompt.submit':
+      Object.assign(f, { quest: { title: `Quest ${f.done + 1}` }, qTools: 0, qErrors: 0, qStart: simT - ageOf(ev), scroll: instant ? 0 : 1.9 });
+      toDesk(f, instant); break;
+    case 'tool.start': {
+      const m = TOOL[ev.tool] || TOOL.Edit;
+      f.qTools++; f.cur = { k: 'tool', tool: ev.tool, target: ev.target, act: m.act, dur: LINGER };
+      goOrPlace(f, spotFor(f, m.st), instant); break;
+    }
+    case 'tool.end':
+      if (ev.status === 'error') { if (instant) f.qErrors++; else fail(f); break; }
+      if (f.state === 'waiting') { f.state = 'idle'; f.cur = null; }
+      if (f.cur?.k === 'tool') { f.cur.dur = TOOL_TAIL; if (f.state === 'working') f.timer = Math.min(f.timer, TOOL_TAIL); }
+      break;
+    case 'permission.request': halt(f, 'waiting'); f.waitSince = simT - ageOf(ev); f.cur = { k: 'perm' }; break;
+    case 'session.stop':
+      f.done++;
+      if (instant) { toDesk(f, true); break; }
+      halt(f, 'celebrating'); f.timer = 2.8; f.cur = { k: 'stop' }; burst(f, 'confetti', reduceMotion ? 10 : 46);
+      break;
+    case 'subagent.stop': if (!instant) cubHeadsHome(f); break;
+    case 'session.end': nap(f, instant); break;
+  }
+}
+function applyLive(ev, instant) {
+  if (appliedIds.has(ev.id)) return; // a reconnect replays the backlog
+  appliedIds.add(ev.id);
+  const f = liveFox(ev, instant); if (!f) return;
+  f.lastAt = Math.max(f.lastAt, Date.parse(ev.ts));
+  if (ev.usage) { f.tIn += ev.usage.inputTokens; f.tOut += ev.usage.outputTokens; if (ev.usage.model) f.model = ev.usage.model; }
+  f.events.push({ ev, cub: !!ev.parentSessionId }); if (f.events.length > 50) f.events.shift();
+  logEvent(f, ev);
+  react(f, ev, instant);
+}
+
+// a finished timer: done working, done cheering or done stumbling, the fox stands idle
+function settle(f) {
+  if (f.state === 'sleeping' || f.state === 'waiting') return;
+  if (f.cur?.k === 'tool') { f.cur = null; f.target = null; }
+  f.state = 'idle'; f.act = null;
+}
+function liveTick(f, dt) {
+  if (f.timer > 0) { f.timer -= dt; if (f.timer <= 0) settle(f); return; }
+  if (f.state === 'walking') f.state = 'idle'; // arrived with no job there
+  const quiet = (Date.now() - f.lastAt) / 1000;
+  if (f.state === 'waiting') { if (quiet > WAIT_HOLD) nap(f); return; }
+  if (f.state === 'working' && f.act === 'think') { if (quiet > THINK_HOLD) { f.turnOpen = false; nap(f); } return; }
+  if (f.state !== 'idle') return;
+  if (f.turnOpen) {
+    if (f.cur?.k === 'desk') { f.state = 'working'; f.act = 'think'; } else toDesk(f, false);
+    return;
+  }
+  if (quiet > NAP_AFTER) return nap(f);
+  f.idleT += dt;
+  if (f.idleT < f.beat) return;
+  f.idleT = 0; f.beat = rnd(...IDLE_BEAT);
+  if (f.cur?.k === 'desk') { f.cur = { k: 'wander' }; goTo(f, rugSpot()); } else toDesk(f, false);
+}
+// after replaying history, foxes whose sessions went quiet long ago start out asleep
+function settleReplay() {
+  for (const f of liveFoxes.values()) {
+    const quiet = (Date.now() - f.lastAt) / 1000;
+    const hold = f.state === 'waiting' ? WAIT_HOLD : f.turnOpen ? THINK_HOLD : NAP_AFTER;
+    if (f.state !== 'sleeping' && quiet > hold) { f.turnOpen = false; nap(f, true); }
+  }
+}
+
+function setConn(text, ok) {
+  $('conn').lastElementChild.textContent = text;
+  $('conn').style.color = ok ? '' : 'var(--alert)';
+}
+function startLive() {
+  $('lvl').closest('.chip').hidden = true; // XP comes later; these belong to the demo
+  document.querySelector('.seg').hidden = true;
+  $('approve').hidden = true; $('deny').hidden = true;
+  $('d-name').textContent = 'No foxes yet';
+  setConn('Connecting', false);
+  let backlog = null, first = true;
+  const es = new EventSource('/events');
+  es.onopen = () => { backlog = []; setConn('Live', true); };
+  es.onerror = () => setConn('Reconnecting', false);
+  es.onmessage = m => {
+    let ev; try { ev = JSON.parse(m.data); } catch { return; }
+    if (backlog) backlog.push(ev); else applyLive(ev, false);
+  };
+  es.addEventListener('ready', () => {
+    const replay = backlog || []; backlog = null;
+    replay.forEach(ev => applyLive(ev, true));
+    settleReplay();
+    if (!first) return;
+    first = false;
+    const n = liveFoxes.size, awake = [...liveFoxes.values()].filter(f => f.state !== 'sleeping').length;
+    if (!n) toast('Your den is empty', 'Start a Claude Code session with the Foxhole plugin and a fox will move in.');
+    else toast(`${n} fox${n > 1 ? 'es' : ''} in your HQ`, awake ? `${awake} awake right now.` : 'Everyone is asleep. They wake on the next event.');
+  });
+}
+function renderHq() {
+  const n = DENS.filter(d => d.open).length;
+  if (LIVE) $('hq').textContent = `Your HQ · ${n} active department${n === 1 ? '' : 's'}`;
+}
+
 /* ---------- loop ---------- */
 resize(); overview(true);
-select(DENS[0].foxes[0]);
+if (LIVE) startLive(); else { setConn('Demo', true); select(DENS[0].foxes[0]); }
 let last = performance.now(), uiAcc = 0;
 function frame(now) {
   const raw = Math.min(0.05, (now - last) / 1000); last = now;
