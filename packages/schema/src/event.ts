@@ -50,6 +50,8 @@ export const FoxholeEvent = z
     tool: z.string().min(1).optional(),
     target: z.string().max(MAX_TARGET_LENGTH).nullable().optional(),
     status: z.enum(STATUSES).optional(),
+    /** For subagent events: the agent's type label (e.g. "Explore"), never its prompt or output. */
+    agentType: z.string().min(1).max(MAX_TARGET_LENGTH).optional(),
     usage: Usage.optional(),
     repo: z.string().min(1).optional(),
     branch: z.string().min(1).optional(),

@@ -42,6 +42,12 @@ describe("FoxholeEvent", () => {
     expect(safeParseEvent({ ...base, target: "x".repeat(MAX_TARGET_LENGTH + 1) }).success).toBe(false);
   });
 
+  it("accepts a subagent event with its parent and agent type", () => {
+    const subagent = { ...base, type: "subagent.stop", parentSessionId: "s_41a", sessionId: "agent-7" };
+    expect(safeParseEvent({ ...subagent, agentType: "Explore" }).success).toBe(true);
+    expect(safeParseEvent({ ...subagent, agentType: "x".repeat(MAX_TARGET_LENGTH + 1) }).success).toBe(false);
+  });
+
   it("rejects other schema versions and unknown types", () => {
     expect(safeParseEvent({ ...base, v: 2 }).success).toBe(false);
     expect(safeParseEvent({ ...base, type: "tool.started" }).success).toBe(false);

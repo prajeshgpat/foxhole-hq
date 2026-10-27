@@ -1,4 +1,4 @@
-import type { EventType, FoxholeEvent, Usage } from "@foxhole-hq/schema";
+import { MAX_TARGET_LENGTH, type EventType, type FoxholeEvent, type Usage } from "@foxhole-hq/schema";
 import type { RepoInfo } from "./git";
 import { targetFor, type TargetMode } from "./target";
 
@@ -17,6 +17,9 @@ export interface ClaudeHookInput {
   tool_response?: unknown;
   message?: string;
   notification_type?: string;
+  /** SubagentStop only: the subagent's own id and type; `session_id` is then the parent's. */
+  agent_id?: string;
+  agent_type?: string;
 }
 
 export interface NormalizeContext {
@@ -71,17 +74,20 @@ function typeFor(input: ClaudeHookInput): { type: EventType; status?: FoxholeEve
 export function normalizeClaudeHook(input: ClaudeHookInput, ctx: NormalizeContext): FoxholeEvent | null {
   const mapped = typeFor(input);
   if (!mapped || !input.session_id) return null;
+  // A subagent stop belongs to the subagent itself, linked back to the session that spawned it.
+  const subagentId = mapped.type === "subagent.stop" ? input.agent_id : undefined;
   const event: FoxholeEvent = {
     v: 1,
     id: ctx.id,
     ts: ctx.ts,
     source: "claude-code",
     machineId: ctx.machineId,
-    sessionId: input.session_id,
-    parentSessionId: null,
+    sessionId: subagentId || input.session_id,
+    parentSessionId: subagentId ? input.session_id : null,
     type: mapped.type,
   };
   if (mapped.status) event.status = mapped.status;
+  if (subagentId && input.agent_type) event.agentType = input.agent_type.slice(0, MAX_TARGET_LENGTH);
   if (input.tool_name && (mapped.type === "tool.start" || mapped.type === "tool.end")) {
     event.tool = input.tool_name;
     event.target = targetFor(input.tool_name, input.tool_input, input.cwd ?? process.cwd(), ctx.targetMode);

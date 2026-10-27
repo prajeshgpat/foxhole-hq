@@ -81,6 +81,32 @@ describe("normalizeClaudeHook", () => {
     );
   });
 
+  it("files a subagent stop under the subagent, linked to its parent session", () => {
+    const e = run({ hook_event_name: "SubagentStop", agent_id: "agent-7", agent_type: "Explore" });
+    expect(e).toMatchObject({ sessionId: "agent-7", parentSessionId: "abc-123", agentType: "Explore" });
+    expect(safeParseEvent(e).success).toBe(true);
+  });
+
+  it("never copies the subagent's last message", () => {
+    const e = run({
+      hook_event_name: "SubagentStop",
+      agent_id: "agent-7",
+      last_assistant_message: "the api key is hunter2",
+    } as Partial<ClaudeHookInput>);
+    expect(JSON.stringify(e)).not.toContain("hunter2");
+  });
+
+  it("keeps a subagent stop on the parent session when the payload has no agent id", () => {
+    const e = run({ hook_event_name: "SubagentStop" });
+    expect(e).toMatchObject({ sessionId: "abc-123", parentSessionId: null });
+    expect(e).not.toHaveProperty("agentType");
+  });
+
+  it("shortens long agent type names so the event still validates", () => {
+    const e = run({ hook_event_name: "SubagentStop", agent_id: "agent-7", agent_type: "x".repeat(500) });
+    expect(safeParseEvent(e).success).toBe(true);
+  });
+
   it("attaches usage only to stop and end events", () => {
     const usage = { inputTokens: 10, outputTokens: 2 };
     expect(run({ hook_event_name: "Stop" }, { usage })?.usage).toEqual(usage);

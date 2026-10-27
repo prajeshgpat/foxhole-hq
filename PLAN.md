@@ -331,7 +331,7 @@ Extras: cosmetic packs/seasonal items, cost analytics reports, sponsored integra
 
 - [x] Claude Code hooks log normalized events to a local file (`packages/plugin-claude`, verified in a real session).
 - [x] Confirm token usage can be read per session (incremental transcript reader in `packages/agent`).
-- [ ] Run on a few real working sessions; confirm Notification (permission) and SubagentStop payloads.
+- [x] Run on a few real working sessions; confirm Notification (permission) and SubagentStop payloads (`permission_prompt` notifications map to `permission.request`; subagent stops are filed under the subagent's id, linked to the parent session).
 
 ### Phase 1 — Local MVP (weeks 2–4)
 
