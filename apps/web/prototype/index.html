@@ -245,11 +245,15 @@ const P = { floorA: '#6f4d36', floorB: '#674731', hallA: '#4b433b', hallB: '#463
    cut into the hill at level -1. Repo dens hang off it at single corners: the first off the Commons' bottom
    corner, the next two off that den's left and right corners, and the fourth off its bottom corner again, a floor
    lower; every three dens a new floor opens. Each den's floor is level with the grass at its anchor's front corner,
-   so it needs a retaining wall only along its back, tallest at the back corner and tapering to nothing in front.
-   A den's wall therefore tops out exactly at its parent's floor, and no wall ever covers a neighbour. */
+   so it needs a retaining wall only along its back, tapering to nothing in front. Its walls top out at its parent's
+   floor, and where it tucks under that room, the parent's front edge drops to it as a retaining wall.
+   Dens overlap their neighbours' corners by OVERLAP floor squares, so no lawn shows between them. Walls and slab edges
+   that fall inside a neighbour on the same floor become a low divider, so only the outside of the merged shape has
+   walls; inside a neighbour on a higher floor they are left out altogether. */
 const REPO_W = 13, REPO_H = 11;   // a repo room, in tiles
 const CM_W = 9, CM_H = 7;         // the Commons
-const ROOM_R = 1.2;               // corner radius of a room, in tiles
+const ROOM_R = 1;                 // corner radius of a room, in tiles
+const OVERLAP = 3;                // floor squares neighbouring dens share at their corners
 const SLOPE = 3.3;                // px the grass drops per tile toward the viewer
 const G_TOP = SLOPE * (CM_W + CM_H);                       // grass height at the world origin: level with the Commons' front corner
 const groundZ = (x, y) => G_TOP - SLOPE * (x + y);
@@ -257,9 +261,15 @@ const CM_EXTRA = 20;              // the Commons floor sits this far below the g
 const SLOT_CAP = 9;               // three floors of three dens; later repos' foxes wait in the Commons
 // den n hangs off a corner of an earlier one: n = 3g anchors floor g, the next two sit to its left and right
 const slotCell = n => { const g = Math.floor(n / 3), r = n % 3; return r === 0 ? [g, g] : r === 1 ? [g - 1, g + 1] : [g + 1, g - 1]; };
-const SLOT_ORIGINS = Array.from({ length: SLOT_CAP }, (_, n) => { const [i, j] = slotCell(n); return [CM_W + i * REPO_W, CM_H + j * REPO_H]; });
+// dens are squeezed together so each shares a OVERLAP x OVERLAP square of floor with every neighbour at its corners; the
+// outer walls run round the merged shape and a low divider marks where each den's own space ends
+const STEP_W = REPO_W - OVERLAP, STEP_H = REPO_H - OVERLAP;
+const SLOT_X0 = CM_W - OVERLAP, SLOT_Y0 = CM_H - OVERLAP;
+const SLOT_ORIGINS = Array.from({ length: SLOT_CAP }, (_, n) => { const [i, j] = slotCell(n); return [SLOT_X0 + i * STEP_W, SLOT_Y0 + j * STEP_H]; });
 // a floor's level: the grass height at its anchor's front corner
-const SLOT_Z0 = Array.from({ length: SLOT_CAP }, (_, n) => { const g = Math.floor(n / 3) + 1; return groundZ(CM_W + g * REPO_W, CM_H + g * REPO_H); });
+// the floor height a den's walls must not rise above: its parent's floor, for the den that opens a new level (the others share their anchor's level)
+const SLOT_CAP_Z = n => n % 3 ? Infinity : n === 0 ? -CM_EXTRA : SLOT_Z0[n - 3];
+const SLOT_Z0 = Array.from({ length: SLOT_CAP }, (_, n) => { const g = Math.floor(n / 3); return groundZ(SLOT_X0 + g * STEP_W + REPO_W, SLOT_Y0 + g * STEP_H + REPO_H); });
 // the den's own corner where it meets the room it hangs off, in room tiles; it opens out of there
 const SLOT_PIVOT = n => [[0, 0], [REPO_W, 0], [0, REPO_H]][n % 3];
 const DEN_HOLE = { side: 'back', at: 7.1 };       // every den's way in: a hole in its back wall, under a hole in the grass
@@ -463,10 +473,11 @@ const holeOf = d => (d.isCommons ? COMMONS_HOLE : d.slot == null ? null : DEN_HO
 const byHole = (h, along, out) => (h.side === 'back' ? [h.at + along, out] : [out, h.at + along]);
 // the grass height above a room's floor at a point of the room (tiles), i.e. how tall its back wall stands there
 const grassAt = (d, lx, ly) => groundZ(d.ox + lx, d.oy + ly) - d.z0;
-const wallTop = (d, lx, ly) => Math.max(0, grassAt(d, lx, ly));
+// a floor's first den hangs a level below its parent, so its walls top out at the parent's floor (d.wallCap) rather than the grass
+const wallTop = (d, lx, ly) => Math.max(0, Math.min(grassAt(d, lx, ly), d.wallCap ?? Infinity));
 // a wall-mounted thing's height, kept under the wall's top so it never pokes out into the grass
 const fit = (d, lx, ly, h) => Math.min(h, wallTop(d, lx, ly) - 4);
-// the top of a room's hole ladder: the grass above its floor
+// the top of a room's hole shaft: the grass above its floor
 const shaftTop = d => { const h = holeOf(d); return h ? wallTop(d, ...byHole(h, 0, 0)) : 0; };
 // where a fox steps into or out of a room: just inside its wall hole
 const doorOf = d => byHole(holeOf(d), 0, 0.3);
@@ -484,8 +495,8 @@ function popOut(f) {
   burst(f, 'smoke', 8);
 }
 
-/* ---------- climbing: foxes go up and down the ladder in a room's hole ---------- */
-const CLIMB_SPEED = 45; // px per second up or down a ladder
+/* ---------- climbing: foxes scramble up and down the shaft of a room's hole ---------- */
+const CLIMB_SPEED = 45; // px per second up or down a shaft
 function startClimb(f, z, done) { Object.assign(f, { state: 'climbing', travel: false, path: [], climbTo: z, onClimbed: done }); }
 function climbTick(f, dt) {
   const step = CLIMB_SPEED * dt, left = f.climbTo - (f.z || 0);
@@ -681,6 +692,7 @@ function tick(dt) {
       const p = d.parts[i];
       p.x += p.vx * dt; p.y += p.vy * dt; p.life -= dt;
       if (p.kind === 'confetti') { p.vy += 300 * dt; p.rot += dt * 8; }
+      if (p.kind === 'dust') { p.vx *= 1 - 1.5 * dt; p.vy *= 1 - 1.2 * dt; }
       if (p.life <= 0) d.parts.splice(i, 1);
     }
   }
@@ -704,9 +716,10 @@ function layoutRooms(dt) {
     const open = active || idleFor(d) < ROOM_IDLE;
     if (open && d.slot == null) d.slot = freeSlot(); // stays null while every slot is taken
     placeInSlot(d);
-    if (open !== d.open) { d.open = open; if (d.slot != null) burst({ den: d, x: d.w / 2, y: d.h / 2 }, 'smoke', 16); }
+    if (open !== d.open) { d.open = open; d.landed = false; }
     d.t = Math.min(1, Math.max(0, d.t + (open && d.slot != null ? dt : -dt) / ROOM_ANIM));
     d.grow = open ? easeOutBack(d.t) : d.t ** 3;
+    if (open && d.slot != null && !d.landed && d.t >= LAND_T) { d.landed = true; landDust(d); }
     if (!open && d.t === 0) d.slot = null;
   }
 }
@@ -715,7 +728,7 @@ function freeSlot() {
   const i = SLOT_ORIGINS.findIndex((_, k) => !used.has(k));
   return i < 0 ? null : i;
 }
-function placeInSlot(d) { if (d.slot != null) { [d.ox, d.oy] = SLOT_ORIGINS[d.slot]; d.z0 = SLOT_Z0[d.slot]; } }
+function placeInSlot(d) { if (d.slot != null) { [d.ox, d.oy] = SLOT_ORIGINS[d.slot]; d.z0 = SLOT_Z0[d.slot]; d.wallCap = SLOT_CAP_Z(d.slot) - d.z0; } }
 // a room about to be used again gets its slot right away, so its fox has a hole to come out of
 function ensureSlot(d) { if (d.slot == null) { d.slot = freeSlot(); placeInSlot(d); } return d.slot != null; }
 const openDens = () => DENS.filter(d => d.slot != null && d.grow > 0.01);
@@ -731,11 +744,16 @@ function rrPoints(x0, y0, x1, y1, r, seg = 5) {
   return pts;
 }
 // a room's outline and its edge stretches (inward normal, whether it faces the viewer), cached per size
+const EDGE_STEP = 0.5; // tiles between sampled points along a room's outline
 const pits = new Map();
 function pitOf(w, h) {
   const key = w + 'x' + h;
   if (pits.has(key)) return pits.get(key);
-  const edge = rrPoints(0, 0, w, h, ROOM_R);
+  // sampled finely so a long straight edge can be buried by a neighbour part of the way along
+  const edge = rrPoints(0, 0, w, h, ROOM_R).flatMap((p, i, all) => {
+    const q = all[(i + 1) % all.length], n = Math.ceil(Math.hypot(q[0] - p[0], q[1] - p[1]) / EDGE_STEP);
+    return Array.from({ length: n }, (_, k) => [p[0] + (q[0] - p[0]) * k / n, p[1] + (q[1] - p[1]) * k / n]);
+  });
   const segs = edge.map((p, i) => {
     const q = edge[(i + 1) % edge.length], m = [(p[0] + q[0]) / 2, (p[1] + q[1]) / 2];
     let n = [q[1] - p[1], p[0] - q[0]];
@@ -754,32 +772,50 @@ function addPath(pts, z, dx = 0, dy = 0) {
 const EARTH = { stone: '#5c4838', root: '#2c1d14', post: '#6b4a30', postDark: '#4f3523', blade: '#4b7039', ledge: '#8a6446' };
 // earth-wall details along a straight run: `topAt(u)` is the wall's height u tiles along it and `at(u, z)` maps a
 // position along it and a height to the screen; the wall slopes, so everything follows its top
-function wallDressing(len, topAt, at) {
+function wallDressing(len, topAt, at, hidden = () => false) {
   for (let k = 0; k < len * 1.3; k++) {
     const u = 0.9 + ((k * 0.77) % (len - 1.6)), z = 10 + ((k * 37) % 70);
-    if (z > topAt(u) - 14) continue;
+    if (z > topAt(u) - 14 || hidden(u)) continue;
     const p = at(u, z); ell(p[0], p[1], 3.2, 2, EARTH.stone);
   }
   for (let k = 0; k < len / 1.6; k++) {
     const u = 1.1 + k * 1.6 + ((k * 13) % 5) / 10, top = topAt(u);
-    if (top > 20) line(at(u, top), at(u + 0.08, top - 12 - (k % 3) * 6), EARTH.root, 1.4);
+    if (top > 20 && !hidden(u)) line(at(u, top), at(u + 0.08, top - 12 - (k % 3) * 6), EARTH.root, 1.4);
   }
   [1.6, len / 2 - 0.6, len - 1.5].forEach(u => {
     const top = topAt(u);
-    if (u < 1 || u > len - 1 || top < 26) return;
+    if (u < 1 || u > len - 1 || top < 26 || hidden(u)) return;
     const b0 = at(u - 0.1, 0), b1 = at(u + 0.1, 0), t1 = at(u + 0.1, top - 4), t0 = at(u - 0.1, top - 4);
     poly([b0, b1, t1, t0], EARTH.post); line(b1, t1, EARTH.postDark, 1.5);
   });
-  const ta = topAt(0.8), tb = topAt(len - 0.8);
-  if (Math.min(ta, tb) > 24) poly([at(0.8, ta - 12), at(len - 0.8, tb - 12), at(len - 0.8, tb - 5), at(0.8, ta - 5)], EARTH.post);
-  for (let u = 0.6; u < len - 0.4; u += 0.45) { const top = topAt(u); line(at(u, top), at(u + 0.06, top - 5), EARTH.blade, 1.6); }
+  for (let u = 0.8; u < len - 0.8 - 1e-6; u += 0.4) {
+    const v = Math.min(u + 0.4, len - 0.8), ta = topAt(u), tb = topAt(v);
+    if (Math.min(ta, tb) > 24 && !hidden((u + v) / 2)) poly([at(u, ta - 12), at(v, tb - 12), at(v, tb - 5), at(u, ta - 5)], EARTH.post);
+  }
+  for (let u = 0.6; u < len - 0.4; u += 0.45) if (!hidden(u)) { const top = topAt(u); line(at(u, top), at(u + 0.06, top - 5), EARTH.blade, 1.6); }
 }
 // A den dug into the slope: a retaining wall along its back that follows the grass down the hill, tallest at the back
 // corner and nothing at the front, where the room opens onto the lawn as a cutaway with a thin floor slab.
+// whether a world point lies inside a shown room's rounded outline
+function insideRoom(o, wx, wy) {
+  const lx = wx - o.ox, ly = wy - o.oy;
+  if (lx <= 0 || ly <= 0 || lx >= o.w || ly >= o.h) return false;
+  return Math.hypot(Math.max(ROOM_R - lx, lx - (o.w - ROOM_R), 0), Math.max(ROOM_R - ly, ly - (o.h - ROOM_R), 0)) < ROOM_R - 0.03;
+}
+// Border priority: the room nearer the Commons keeps its walls where two overlap, so each room loses only the one corner
+// where it hangs off an earlier room. `cutBy` are the rooms whose space buries this room's own walls and slab edge.
+const rank = d => (d.isCommons ? -1 : d.slot);
+const buriedIn = d => [COMMONS, ...openDens()].filter(o => o !== d && rank(o) < rank(d) && o.z0 >= d.z0 - 0.5);
+const buriedAt = (rooms, d, x, y) => rooms.some(o => insideRoom(o, d.ox + x, d.oy + y));
 function drawPitShell(d, floorA, floorB) {
-  const { edge, segs } = pitOf(d.w, d.h);
+  const { edge, segs: allSegs } = pitOf(d.w, d.h), over = buriedIn(d);
+  const segs = allSegs.filter(s => !buriedAt(over, d, ...s.m));
+  // a front edge that runs over a lower room is a retaining wall down to that room's floor, not just a thin slab
+  const below = [COMMONS, ...openDens()].filter(o => o !== d && rank(o) > rank(d) && o.z0 < d.z0 - 0.5);
   segs.filter(s => !s.back).forEach(s => {
-    poly([iso(...s.p, -LIP), iso(...s.q, -LIP), iso(...s.q, 0), iso(...s.p, 0)], P.soil);
+    const lower = below.find(o => insideRoom(o, d.ox + s.m[0], d.oy + s.m[1])), drop = lower ? d.z0 - lower.z0 : LIP;
+    poly([iso(...s.p, -drop), iso(...s.q, -drop), iso(...s.q, 0), iso(...s.p, 0)], lower ? (s.leftish ? P.wallL : P.wallR) : P.soil);
+    if (lower) poly([iso(...s.p, -drop), iso(...s.q, -drop), iso(...s.q, 6 - drop), iso(...s.p, 6 - drop)], P.base);
     line(iso(...s.p, 0), iso(...s.q, 0), EARTH.ledge, 2);
   });
   for (const s of segs.filter(s => s.back)) {
@@ -788,18 +824,38 @@ function drawPitShell(d, floorA, floorB) {
     poly([iso(...s.p, 0), iso(...s.q, 0), iso(...s.q, Math.min(6, tq)), iso(...s.p, Math.min(6, tp))], P.base);
     ctx.lineCap = 'round'; line(iso(...s.p, tp), iso(...s.q, tq), P.dirt, 4); ctx.lineCap = 'butt';
   }
-  wallDressing(d.w - 2 * ROOM_R, u => wallTop(d, ROOM_R + u, 0), (u, z) => iso(ROOM_R + u, 0.01, z));
-  wallDressing(d.h - 2 * ROOM_R, u => wallTop(d, 0, ROOM_R + u), (u, z) => iso(0.01, ROOM_R + u, z));
+  wallDressing(d.w - 2 * ROOM_R, u => wallTop(d, ROOM_R + u, 0), (u, z) => iso(ROOM_R + u, 0.01, z), u => buriedAt(over, d, ROOM_R + u, 0.01));
+  wallDressing(d.h - 2 * ROOM_R, u => wallTop(d, 0, ROOM_R + u), (u, z) => iso(0.01, ROOM_R + u, z), u => buriedAt(over, d, 0.01, ROOM_R + u));
   ctx.save();
   ctx.beginPath(); addPath(edge, 0); ctx.clip();
+  const higher = over.filter(o => o.z0 > d.z0 + 0.5);
+  // the floor stops at the exact outline of any room above it, so no sliver of lawn shows at that room's rounded corner
+  for (const o of higher) {
+    ctx.beginPath(); ctx.rect(-1e5, -1e5, 2e5, 2e5);
+    pitOf(o.w, o.h).edge.forEach(([x, y], i) => { const q = iso(o.ox - d.ox + x, o.oy - d.oy + y, 0); i ? ctx.lineTo(q[0], q[1]) : ctx.moveTo(q[0], q[1]); });
+    ctx.closePath(); ctx.clip('evenodd');
+  }
   for (let i = 0; i < d.w; i++) for (let j = 0; j < d.h; j++)
     poly([iso(i, j), iso(i + 1, j), iso(i + 1, j + 1), iso(i, j + 1)], (i + j) % 2 ? floorA : floorB);
-  // little light reaches the floor along the back walls
-  const a = iso(0, 0), b = iso(2.2, 2.2), g = ctx.createLinearGradient(a[0], a[1], b[0], b[1]);
-  g.addColorStop(0, 'rgba(10,6,4,.45)'); g.addColorStop(1, 'rgba(10,6,4,0)');
-  ctx.fillStyle = g; ctx.fillRect(a[0] - 2000, a[1] - 400, 4000, 1200);
+  // little light reaches the floor along the back walls, except where a higher room covers this one
+  if (!higher.length) {
+    const a = iso(0, 0), b = iso(2.2, 2.2), g = ctx.createLinearGradient(a[0], a[1], b[0], b[1]);
+    g.addColorStop(0, 'rgba(10,6,4,.45)'); g.addColorStop(1, 'rgba(10,6,4,0)');
+    ctx.fillStyle = g; ctx.fillRect(a[0] - 2000, a[1] - 400, 4000, 1200);
+  }
   ctx.restore();
   if (!d.isCommons) drawLantern(d, 9.6);
+}
+// the low wall along the edge of a room that runs through a later neighbour on the same floor: it marks where this den's
+// own space ends once the outer walls have merged. Drawn after every room so no neighbour's floor paints over it.
+const DIVIDER_H = 16;
+function drawDividers(d) {
+  const same = [COMMONS, ...openDens()].filter(o => o !== d && rank(o) > rank(d) && Math.abs(o.z0 - d.z0) < 0.5);
+  if (!same.length) return;
+  for (const s of pitOf(d.w, d.h).segs.filter(s => buriedAt(same, d, ...s.m))) {
+    poly([iso(...s.p, 0), iso(...s.q, 0), iso(...s.q, DIVIDER_H), iso(...s.p, DIVIDER_H)], s.leftish ? P.wallL : P.wallR);
+    ctx.lineCap = 'round'; line(iso(...s.p, DIVIDER_H), iso(...s.q, DIVIDER_H), P.dirt, 3); ctx.lineCap = 'butt';
+  }
 }
 // a warm lantern hanging on the back wall, below its top
 function drawLantern(d, x) {
@@ -815,7 +871,7 @@ function drawLantern(d, x) {
   ctx.fillStyle = '#3a2a1c'; ctx.fillRect(p[0] - 4, p[1] - 6, 8, 2);
   ctx.fillStyle = '#ffd38a'; ctx.fillRect(p[0] - 3, p[1] - 4, 6, 7);
 }
-// a room's way in from the lawn: a grass hole, a shaft down through the wall with a ladder in it, and an arched tunnel mouth at the floor
+// a room's way in from the lawn: a grass hole, a shaft down through the wall, and an arched tunnel mouth at the floor
 function drawWallHole(d) {
   const h = holeOf(d);
   if (!h) return;
@@ -829,10 +885,6 @@ function drawWallHole(d) {
   ctx.lineJoin = 'round'; ctx.strokeStyle = P.dirt; ctx.lineWidth = 6;
   ctx.beginPath(); pts.forEach((p, i) => i ? ctx.lineTo(...p) : ctx.moveTo(...p)); ctx.closePath(); ctx.stroke();
   poly(pts, P.hole);
-  ctx.lineCap = 'round';
-  [-0.17, 0.17].forEach(side => line(on(side, 0), on(side, top - 4), '#8a6240', 3));
-  for (let z = 7; z < top - 4; z += 9) line(on(-0.17, z), on(0.17, z), '#a0714a', 2);
-  ctx.lineCap = 'butt';
   const [mx, my] = byHole(h, 0, 0.35), m = iso(mx, my); ell(m[0], m[1], 22, 7, 'rgba(86,57,42,.75)');
 }
 
@@ -1037,6 +1089,7 @@ function drawParts(d) {
     const a = Math.max(0, p.life / p.max);
     if (p.kind === 'confetti') { ctx.save(); ctx.translate(p.x, p.y); ctx.rotate(p.rot); ctx.globalAlpha = a; ctx.fillStyle = p.color; ctx.fillRect(-2.5, -1.5, 5, 3); ctx.restore(); }
     else if (p.kind === 'smoke') { ctx.globalAlpha = a * 0.6; ell(p.x, p.y, p.r * (2 - a), p.r * (2 - a), '#bfb8ad'); }
+    else if (p.kind === 'dust') { ctx.globalAlpha = a * 0.55; const r = p.r * (1.9 - 0.9 * a); ell(p.x, p.y, r, r * 0.8, '#7d6247'); ell(p.x - r * 0.3, p.y - r * 0.2, r * 0.7, r * 0.55, '#a38763'); }
     else if (p.kind === 'xp') { ctx.globalAlpha = Math.min(1, a * 1.6); ctx.fillStyle = COL.alert; ctx.font = `800 15px ${FONT}`; ctx.textAlign = 'center'; ctx.fillText(p.text, p.x, p.y); ctx.textAlign = 'left'; }
     else if (p.kind === 'glyph') { ctx.globalAlpha = Math.min(1, a * 1.8); ctx.fillStyle = p.color; ctx.font = `600 ${p.size}px ${MONO}`; ctx.textAlign = 'center'; ctx.fillText(p.text, p.x, p.y); ctx.textAlign = 'left'; }
     else if (p.kind === 'z') { ctx.globalAlpha = a * 0.85; ctx.fillStyle = '#cfe3ff'; ctx.font = `600 ${11 + (1 - a) * 6}px ${FONT}`; ctx.fillText('z', p.x, p.y); }
@@ -1175,9 +1228,11 @@ function render(t) {
   ctx.setTransform(scr.dpr * view.s, 0, 0, scr.dpr * view.s, scr.dpr * view.ox, scr.dpr * view.oy);
   ctx.lineCap = 'butt';
   drawGrounds(t);
-  // rooms back to front by their centres: dens meet only at corners, so no wall ever covers a neighbour
+  // rooms back to front by their centres; a room's walls inside a neighbour are left out, so none covers it
   const rooms = [COMMONS, ...openDens()].sort((a, b) => depthOf(a) - depthOf(b));
   rooms.forEach(d => drawDen(d, t));
+  rooms.filter(d => d.t >= 1 && (d.isCommons || d.open)).forEach(d => { OFF = [d.ox, d.oy]; OFFZ = d.z0; drawDividers(d); });
+  OFFZ = 0;
   drawOutdoors(t);
   OFF = [0, 0];
   ctx.globalCompositeOperation = 'lighter';
@@ -1197,16 +1252,42 @@ function render(t) {
 function drawDen(d, t) {
   OFF = [d.ox, d.oy]; OFFZ = d.z0;
   if (d.isCommons || (d.t >= 1 && d.open)) drawDenContents(d, t);
-  else {
-    // a room opens out of the corner where it hangs off its parent, overshooting a little; closing reverses it
-    const [px, py] = SLOT_PIVOT(d.slot), [cx, cy] = isoAbs(d.ox + px, d.oy + py, groundZ(d.ox + px, d.oy + py)), k = Math.max(0.001, d.grow);
-    ctx.save();
-    ctx.globalAlpha = Math.min(1, k);
-    ctx.translate(cx, cy); ctx.scale(k, k); ctx.translate(-cx, -cy);
-    drawDenContents(d, t);
-    ctx.restore();
-  }
+  else digRoom(d, t);
   OFFZ = 0;
+}
+/* A room is dug down from the lawn: a pit mouth opens in the grass, then the hole deepens and uncovers the room, the
+   floor last. Closing fills the ground back in. The room is drawn where it finally stands and seen through the pit. */
+const DIG_MOUTH_T = 0.2;           // share of the animation spent widening the pit mouth
+const LAND_T = 1;                  // the room has landed (dust goes up) when its animation reaches this
+const easeOutCubic = t => 1 - (1 - t) ** 3;
+function convexHull(pts) {
+  const p = [...pts].sort((a, b) => a[0] - b[0] || a[1] - b[1]), cross = (o, a, b) => (a[0] - o[0]) * (b[1] - o[1]) - (a[1] - o[1]) * (b[0] - o[0]);
+  const half = list => { const h = []; for (const q of list) { while (h.length > 1 && cross(h[h.length - 2], h[h.length - 1], q) <= 0) h.pop(); h.push(q); } h.pop(); return h; };
+  return half(p).concat(half([...p].reverse()));
+}
+function digRoom(d, t) {
+  const { edge } = pitOf(d.w, d.h), ground = ([x, y]) => isoAbs(d.ox + x, d.oy + y, groundZ(d.ox + x, d.oy + y));
+  const rim = edge.map(ground), cx = rim.reduce((a, p) => a + p[0], 0) / rim.length, cy = rim.reduce((a, p) => a + p[1], 0) / rim.length;
+  const mouth = Math.min(1, d.t / DIG_MOUTH_T), reach = (Math.max(0, groundZ(d.ox, d.oy) - d.z0) + LIP + 6) * easeOutCubic(d.t);
+  if (d.t <= 0) return;
+  const top = rim.map(p => [cx + (p[0] - cx) * mouth, cy + (p[1] - cy) * mouth]), pit = convexHull([...top, ...top.map(p => [p[0], p[1] + reach])]);
+  ctx.save();
+  ctx.beginPath(); pit.forEach((p, i) => i ? ctx.lineTo(p[0], p[1]) : ctx.moveTo(p[0], p[1])); ctx.closePath();
+  ctx.fillStyle = P.hole; ctx.fill(); ctx.clip();
+  drawDenContents(d, t);
+  ctx.restore();
+  ctx.lineJoin = 'round'; ctx.strokeStyle = P.dirt; ctx.lineWidth = 5;
+  ctx.beginPath(); top.forEach((p, i) => i ? ctx.lineTo(p[0], p[1]) : ctx.moveTo(p[0], p[1])); ctx.closePath(); ctx.stroke();
+}
+// the dirt a landing room throws up: a ring of dust clouds around its mouth and a few clods
+const CLOD_COLS = ['#56392a', '#6b4a30', '#8a6446'];
+function landDust(d) {
+  const { edge } = pitOf(d.w, d.h);
+  for (let i = 0; i < 40; i++) {
+    const [x, y] = edge[Math.floor(R() * edge.length)], [sx, sy] = isoAbs(d.ox + x, d.oy + y, groundZ(d.ox + x, d.oy + y)), out = [x - d.w / 2, y - d.h / 2];
+    d.parts.push({ kind: 'dust', x: sx + rnd(-8, 8), y: sy + rnd(-4, 4), vx: (out[0] - out[1]) * 2.2 + rnd(-10, 10), vy: (out[0] + out[1]) * 0.8 + rnd(-24, -8), life: rnd(1.2, 2.2), max: 2.2, r: rnd(8, 15) });
+    if (i % 3 === 0) d.parts.push({ kind: 'confetti', x: sx, y: sy - 4, vx: rnd(-60, 60), vy: rnd(-170, -80), life: rnd(0.7, 1.2), max: 1.2, color: CLOD_COLS[i % 3], rot: R() * TAU });
+  }
 }
 function drawDenContents(d, t) {
   if (d.isCommons) return drawCommons(d, t);
