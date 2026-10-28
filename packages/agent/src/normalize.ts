@@ -20,6 +20,8 @@ export interface ClaudeHookInput {
   /** SubagentStop only: the subagent's own id and type; `session_id` is then the parent's. */
   agent_id?: string;
   agent_type?: string;
+  /** Stop only: true when this Stop was itself caused by a Stop hook asking Claude to keep going. */
+  stop_hook_active?: boolean;
 }
 
 export interface NormalizeContext {

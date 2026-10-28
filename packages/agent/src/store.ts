@@ -12,17 +12,20 @@ import { emptyCursor, type UsageCursor } from "./usage";
  *   machine-id        random id for this machine, created once
  *   config.json       user settings, e.g. { "targets": "hash" }
  *   state/<id>.json   per-session cursor into the transcript for token usage
+ *   repos.json        { "host/owner/name": { path, seen } } where each repo lives on this machine (local only)
+ *   inbox/<id>.json   tasks queued for a session, handed over by its next Stop or prompt hook (local only)
+ *   assignments.json  every task hand-off and where it stands (local only)
  *   payload-shapes.jsonl  (debug only) which keys each hook payload had, never their values
  */
 export function homeDir(env: NodeJS.ProcessEnv = process.env): string {
   return env.FOXHOLE_HOME || path.join(os.homedir(), ".foxhole");
 }
 
-function ensureDir(dir: string) {
+export function ensureDir(dir: string) {
   if (!existsSync(dir)) mkdirSync(dir, { recursive: true, mode: 0o700 });
 }
 
-function readJson<T>(file: string, fallback: T): T {
+export function readJson<T>(file: string, fallback: T): T {
   try {
     return JSON.parse(readFileSync(file, "utf8")) as T;
   } catch {
@@ -31,7 +34,7 @@ function readJson<T>(file: string, fallback: T): T {
 }
 
 /** Write via a temp file and rename, so a crash never leaves half a JSON file behind. */
-function writeJsonAtomic(file: string, value: unknown) {
+export function writeJsonAtomic(file: string, value: unknown) {
   const tmp = `${file}.${process.pid}.tmp`;
   writeFileSync(tmp, JSON.stringify(value), { mode: 0o600 });
   renameSync(tmp, file);
@@ -85,7 +88,7 @@ export function readEvents(home: string): FoxholeEvent[] {
   }
 }
 
-const safeName = (sessionId: string) => sessionId.replace(/[^A-Za-z0-9_-]/g, "_").slice(0, 100);
+export const safeName = (sessionId: string) => sessionId.replace(/[^A-Za-z0-9_-]/g, "_").slice(0, 100);
 
 export function readCursor(home: string, sessionId: string): UsageCursor {
   return readJson(path.join(home, "state", safeName(sessionId) + ".json"), emptyCursor());

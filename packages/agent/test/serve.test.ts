@@ -74,7 +74,9 @@ describe("parseLines", () => {
 
   it("keeps valid events and drops blank, broken or off-schema lines", () => {
     const good = event("session.start");
-    const text = [JSON.stringify(good), "", "{not json", JSON.stringify({ ...good, prompt: "secret" })].join("\n");
+    const text = [JSON.stringify(good), "", "{not json", JSON.stringify({ ...good, prompt: "secret" })].join(
+      "\n",
+    );
     expect(parseLines(text)).toEqual([good]);
   });
 });
@@ -115,7 +117,10 @@ describe("startServer", () => {
 
   it("replays recorded events, then signals ready", async () => {
     den.close();
-    writeFileSync(path.join(home, "events.jsonl"), jsonl(event("session.start"), "garbage", event("tool.start")));
+    writeFileSync(
+      path.join(home, "events.jsonl"),
+      jsonl(event("session.start"), "garbage", event("tool.start")),
+    );
     den = await startServer({ home, page, port: 0, pollMs: 10 });
     const messages = await stream(den.port, (m) => m.includes("ready"));
     expect(messages.map((m) => (m === "ready" ? m : JSON.parse(m).type))).toEqual([

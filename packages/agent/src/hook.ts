@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { safeParseEvent, type FoxholeEvent } from "@foxhole-hq/schema";
-import { repoInfo } from "./git";
+import { recordRepo } from "./assign";
+import { repoInfo, repoRoot } from "./git";
 import { normalizeClaudeHook, type ClaudeHookInput } from "./normalize";
 import { appendEvent, machineId, readConfig, readCursor, recordPayloadShape, writeCursor } from "./store";
 import { readNewUsage, transcriptSize } from "./usage";
@@ -43,12 +44,22 @@ export function handleClaudeHook(raw: string, opts: HookOptions): FoxholeEvent |
     writeCursor(opts.home, payload.session_id, read.cursor);
   }
 
+  const repo = repoInfo(cwd);
+  if (
+    repo.repo &&
+    (payload.hook_event_name === "SessionStart" || payload.hook_event_name === "UserPromptSubmit")
+  ) {
+    // remember where this repo lives on this machine, so the den can read its TASKS.md (local file, never uploaded)
+    const root = repoRoot(cwd);
+    if (root) recordRepo(opts.home, repo.repo, root);
+  }
+
   const event = normalizeClaudeHook(payload, {
     id: randomUUID(),
     ts: (opts.now?.() ?? new Date()).toISOString(),
     machineId: machineId(opts.home),
     targetMode: config.targets,
-    repo: repoInfo(cwd),
+    repo,
     usage,
   });
   if (!event) return null;

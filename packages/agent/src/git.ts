@@ -61,3 +61,6 @@ export function repoInfo(cwd: string): RepoInfo {
   if (branch) info.branch = branch;
   return info;
 }
+
+/** The top of the working tree a session is in, or null outside a repo. */
+export const repoRoot = (cwd: string): string | null => git(cwd, ["rev-parse", "--show-toplevel"]);
