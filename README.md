@@ -15,6 +15,33 @@ The full product plan lives in [PLAN.md](PLAN.md). An interactive prototype of t
 | 2     | Hosted dens on Cloudflare, GitHub sign-in, phone alerts | Planned                                                |
 | 3     | Verified global leaderboard (impact per token)          | Planned                                                |
 
+## Try it locally
+
+```sh
+pnpm install
+pnpm den            # builds the CLI, then serves the live den at http://127.0.0.1:4317
+```
+
+Open the page without `?live` (or open `apps/web/prototype/index.html` directly) for the scripted demo. In the demo, click a den to open its panel: sample tasks and pull requests, and you can drag a task onto a fox (or use **Assign to…**).
+
+For real: start a Claude Code session in a repo with the plugin installed, add a `TASKS.md` to the repo, then click that repo's den.
+
+```markdown
+## Ready
+
+- [ ] Fix the login bug <!-- id:t-login --> #bug ~S
+      Optional detail, indented under the item.
+
+## Doing
+
+## Done
+```
+
+- Tasks come from the repo's `TASKS.md` (Foxhole never writes it); open PRs come from your own `gh` login, so install `gh` and run `gh auth login` to see them.
+- Dropping a task on a fox asks first, then queues it locally in `~/.foxhole`. The fox's session gets it from its `Stop` hook at the end of the turn it is in, or from its next prompt if it is idle. Claude Code's permission prompts still apply to everything the task leads to.
+- `foxhole serve --no-assign` turns hand-off off. Task text never goes into the event stream.
+- Checks: `pnpm test`, `pnpm typecheck`, `pnpm lint`, `pnpm format:check`.
+
 ## Architecture
 
 ```mermaid

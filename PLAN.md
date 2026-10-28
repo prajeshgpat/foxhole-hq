@@ -18,7 +18,7 @@ Foxhole HQ is a plugin + website that turns AI coding agents (Claude Code, Codex
 
 ### Non-goals (for now)
 
-- Controlling agents from the website beyond simple approve/deny hand-offs.
+- Driving agents from the hosted website. Local, user-initiated task hand-off to your own sessions is in scope; nothing runs without your explicit drop and confirm.
 - Storing or analyzing source code.
 - Replacing an agent's own UI or terminal.
 
@@ -211,7 +211,7 @@ All adapters normalize into one schema:
 - **Walls and edges.**
   - Only the back sides of the grid (top and left) have earth retaining walls that follow the grass, dressed with stones, roots and timber posts.
   - Between rooms there is a retaining face down to a lower neighbour, or a low divider with a two-tile gap beside a neighbour on the same level.
-  - Open front edges show the floor slab and a faint (10% opaque) glass wall, so you can see the den is underground.
+  - Open front edges show the floor slab and a glass wall (20% opaque), so you can see the den is underground.
 - **Ways in.** A top-row den has a hole in its back wall under a hole in the grass; a left-column den uses its left wall; an inner den has a hatch in its floor, linked by a tunnel to a grass hole on the lawn behind the grid. Foxes climb down shafts and vanish into holes.
 - **Opening and closing.** A den is dug open (the pit mouth widens, the hole deepens, dust and clods fly on landing) when one of its foxes wakes, unless its cell is already floor, in which case it just takes the cell over. It fills back in after 5 minutes with every fox asleep. Rooms close only last-in-first-out, so the grid stays a rectangle.
 - **Moving around.** Drag to pan (edges rubber-band), scroll or pinch to zoom, arrow keys and +/− when focused. Clicking a den's sign, its floor or a fox flies the camera there. The **[ ] fit button** (or `0`) centres every den and zooms one step closer than a tight fit, and keeps them framed as rooms open and close until you move the camera; one zoom-out step shows every den whole.
@@ -359,13 +359,15 @@ Extras: cosmetic packs/seasonal items, cost analytics reports, sponsored integra
 
 Clicking a den opens a side panel with the repo's tasks and open pull requests; a task can be dragged onto a fox. Local only, user-initiated, nothing runs without an explicit drop and confirm.
 
-- [ ] Server hardening before any write route: per-run token, Origin check, JSON-only writes, body cap.
-- [ ] The hook records each repo's local path on `SessionStart` (local file only, never in the event stream).
-- [ ] `GET /api/prs` via the `gh` CLI (cached, no secrets in the repo); `GET /api/tasks` from `TASKS.md` (`- [ ]` items grouped by `## Ready / Doing / Done`, optional `<!-- id:… -->`, `#labels`, `~S/M/L`).
-- [ ] Read-only den panel: Tasks and Pull requests tabs; clicking a PR jumps to its branch corner.
-- [ ] Assign a task: inbox file per session, delivered by the `Stop` hook (`decision: block` with the task text, guarded by `stop_hook_active`) or the next `UserPromptSubmit`; an "Assign to…" button first, for keyboard users.
-- [ ] Drag a task card onto a fox (pointer events, valid-target rings, confirm popover, scroll and confetti on drop).
+- [x] Server hardening before any write route: per-run token, Origin check, JSON-only writes, body cap.
+- [x] The hook records each repo's local path on `SessionStart` (local file only, never in the event stream).
+- [x] `GET /api/prs` via the `gh` CLI (cached, no secrets in the repo); `GET /api/tasks` from `TASKS.md` (`- [ ]` items grouped by `## Ready / Doing / Done`, optional `<!-- id:… -->`, `#labels`, `~S/M/L`).
+- [x] Den panel (prototype page, live and demo): Tasks and Pull requests tabs; clicking a PR jumps to its branch corner.
+- [x] Assign a task: inbox file per session, delivered by the `Stop` hook (`decision: block` with the task text, guarded by `stop_hook_active`) or the next `UserPromptSubmit`; an "Assign to…" button first, for keyboard users.
+- [x] Drag a task card onto a fox (pointer events, valid-target rings, confirm popover, scroll and confetti on drop).
 - [ ] Later: a Foxhole MCP server in the plugin (`foxhole_next_task`), GitHub issues and Linear as task sources, hosted assignment via the GitHub App.
+
+Built and tested locally (`pnpm test`; see the README for the walkthrough). Still to verify against a real Claude Code session: that `decision: block` from a `Stop` hook and `additionalContext` from `UserPromptSubmit` behave as documented.
 
 Task text and PR titles are untrusted input: capped, framed as a user request, never assigned automatically, and never written to `events.jsonl`.
 
@@ -432,6 +434,6 @@ Monorepo with **pnpm workspaces** + **Turborepo**, TypeScript everywhere, Zod fo
 ## 14. Next steps
 
 1. Finish the performance pass (§7).
-2. Read-only den panel: tasks from `TASKS.md` and open PRs via `gh` (§11, Phase 1.5).
-3. Task hand-off to a running session via the Stop hook.
+2. Try task hand-off against a real Claude Code session and tighten what that shows (§11, Phase 1.5).
+3. A Foxhole MCP server in the plugin, then GitHub issues and Linear as task sources.
 4. Put up the landing page + waitlist.
