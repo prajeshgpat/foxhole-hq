@@ -4,7 +4,7 @@
 
 Foxhole HQ turns AI coding agents (Claude Code, Codex and others) into pixel foxes living on a live isometric HQ floor. Every repo is a den, every branch gets its own corner, and each fox acts out what its agent is doing in real time: reading at the bookshelf, typing at its desk, running commands at the server rack, raising a paw when it needs your permission.
 
-The full product plan lives in [PLAN.md](PLAN.md). An interactive prototype of the HQ floor is in [`apps/web/prototype`](apps/web/prototype/index.html): open it in a browser.
+The full product plan lives in [PLAN.md](docs/PLAN.md). An interactive prototype of the HQ floor is in [`apps/web/prototype`](apps/web/prototype/index.html): open it in a browser.
 
 ## Status
 
@@ -126,7 +126,7 @@ Once this is on `main`, it can also be installed as a plugin: `/plugin marketpla
 
 ## Contributing
 
-Work happens on `dev` and reaches `main` only through reviewed pull requests with green CI. See [CONTRIBUTING.md](CONTRIBUTING.md).
+Work happens on `dev` and reaches `main` only through reviewed pull requests with green CI. See [CONTRIBUTING.md](docs/CONTRIBUTING.md).
 
 ## License
 

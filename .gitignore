@@ -11,3 +11,20 @@ dist
 .claude/settings.local.json
 tmp
 .env
+# per-developer project instructions
+CLAUDE.md
+
+# env variants (keep a committed .env.example if one is added)
+.env.*
+!.env.example
+
+# tool caches and editor files
+*.tsbuildinfo
+.eslintcache
+.vscode
+.idea
+Thumbs.db
+
+# private keys and certificates
+*.pem
+*.key
