@@ -1,0 +1,10 @@
+{
+  "name": "foxhole",
+  "version": "0.1.0",
+  "description": "See your agents work as foxes in Foxhole HQ. Records metadata-only events (tool names, short targets, status, token counts) to ~/.foxhole. Never code, prompts or diffs.",
+  "author": { "name": "prajeshgpat" },
+  "homepage": "https://github.com/prajeshgpat/foxhole-hq",
+  "repository": "https://github.com/prajeshgpat/foxhole-hq",
+  "license": "MIT",
+  "keywords": ["observability", "agents", "gamification"]
+}

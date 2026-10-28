@@ -4,6 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Foxhole HQ Den</title>
+<meta name="foxhole-token" content="">
 <meta name="claude:viewport-fit-sides" content="cover">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -84,6 +85,8 @@ header { display: flex; flex-wrap: wrap; gap: 12px 20px; align-items: center; ju
 .stage canvas.dragging { cursor: grabbing; }
 .cam { position: absolute; top: 12px; right: 12px; display: flex; gap: 6px; }
 .cam button { min-width: 36px; height: 36px; padding: 0 10px; border-radius: 9px; background: rgba(17, 25, 22, 0.86); border: 1px solid var(--line); font-weight: 600; font-size: 13px; }
+.cam button svg { display: block; margin: 0 auto; }
+.cam button[aria-pressed="true"] { border-color: var(--line-hi); }
 .cam button:hover { border-color: var(--line-hi); }
 .where { position: absolute; top: 12px; left: 12px; pointer-events: none; }
 .hint { position: absolute; left: 12px; bottom: 12px; pointer-events: none; font-size: 12px; color: var(--muted); background: rgba(17, 25, 22, 0.8); border: 1px solid var(--line); border-radius: 9px; padding: 6px 10px; max-width: calc(100% - 24px); }
@@ -93,6 +96,47 @@ header { display: flex; flex-wrap: wrap; gap: 12px 20px; align-items: center; ju
 .toast b { display: block; color: var(--alert); font-weight: 600; }
 @keyframes toastIn { from { transform: translateY(6px); opacity: 0.4; } to { transform: none; opacity: 1; } }
 
+.den-panel { display: grid; gap: 10px; }
+.den-head { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.den-head strong { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; font-size: 14px; }
+.den-head .swatch { width: 10px; height: 10px; border-radius: 3px; flex: none; }
+.chip-src { font: 600 10px var(--mono); color: var(--muted); border: 1px solid var(--line); border-radius: 6px; padding: 2px 6px; white-space: nowrap; }
+.mini { font-size: 12px; padding: 3px 8px; border-radius: 7px; border: 1px solid var(--line); background: var(--raise); color: var(--fg); }
+.mini:hover { border-color: var(--line-hi); }
+.den-tabs { display: flex; gap: 4px; border-bottom: 1px solid var(--line); }
+.den-tabs button { padding: 6px 10px; font-size: 12px; font-weight: 600; color: var(--muted); border-bottom: 2px solid transparent; }
+.den-tabs button[aria-selected="true"] { color: var(--fg); border-bottom-color: var(--fox); }
+.den-list { display: grid; gap: 8px; max-height: 60vh; overflow: auto; }
+.den-group { display: grid; gap: 6px; }
+.den-group h3, .den-group summary { margin: 4px 0 0; font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); cursor: default; }
+.den-note { margin: 0; font-size: 12px; color: var(--muted); overflow-wrap: anywhere; }
+.den-note.err { color: var(--err); }
+.den-tpl { margin: 0; padding: 8px; border-radius: 8px; background: var(--raise); font: 11px var(--mono); white-space: pre-wrap; }
+.den-hint { margin: 0; font-size: 11px; color: var(--muted); }
+.task, .pr { display: grid; gap: 6px; text-align: left; padding: 9px 10px; border-radius: 10px; background: var(--raise); border: 1px solid var(--line); touch-action: none; }
+.task:not(.done) { cursor: grab; }
+.task.done { opacity: 0.6; }
+.task:focus-visible, .pr:focus-visible { outline: 2px solid var(--fox); outline-offset: 1px; }
+.pr { touch-action: auto; cursor: pointer; }
+.pr:hover { border-color: var(--line-hi); }
+.task-title { font-size: 13px; font-weight: 600; overflow-wrap: anywhere; }
+.task-meta { display: flex; flex-wrap: wrap; gap: 4px; }
+.tag { font: 600 10px var(--mono); padding: 2px 6px; border-radius: 6px; background: rgba(255, 255, 255, 0.06); color: var(--muted); }
+.tag.assigned { background: rgba(255, 183, 77, 0.18); color: var(--fox); }
+.tag.chk-pass { color: var(--ok); } .tag.chk-fail { color: var(--err); } .tag.chk-pending { color: var(--alert); }
+.pr-top { display: flex; gap: 8px; min-width: 0; font-size: 13px; }
+.pr-num { font-family: var(--mono); color: var(--muted); flex: none; }
+.pr-title { overflow-wrap: anywhere; font-weight: 600; }
+.task-actions select { max-width: 100%; }
+.task.ghost { position: fixed; left: 0; top: 0; z-index: 30; width: 260px; pointer-events: none; box-shadow: 0 14px 34px rgba(0, 0, 0, 0.5); cursor: grabbing; }
+.task.ghost[data-over]:not([data-over=""])::after { content: "Drop on " attr(data-over); font-size: 11px; color: var(--alert); font-weight: 600; }
+.confirm { position: fixed; inset: 0; z-index: 40; display: grid; place-items: center; background: rgba(5, 9, 8, 0.6); padding: 16px; }
+.confirm[hidden] { display: none; }
+.confirm-box { width: min(420px, 100%); background: var(--surface); border: 1px solid var(--line-hi); border-radius: 14px; padding: 16px; display: grid; gap: 10px; }
+.confirm-box h3 { margin: 0; font-size: 15px; }
+.confirm-box pre { margin: 0; padding: 10px; border-radius: 8px; background: var(--raise); font: 12px var(--mono); white-space: pre-wrap; overflow-wrap: anywhere; max-height: 40vh; overflow: auto; }
+.confirm-box p { margin: 0; font-size: 12px; color: var(--muted); }
+.confirm-actions { display: flex; justify-content: flex-end; gap: 8px; }
 .rail { display: grid; gap: 14px; min-width: 0; }
 .panel { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px; min-width: 0; }
 .panel h2, .panel h3 { font-size: 11px; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted); margin: 0 0 10px; }
@@ -156,8 +200,8 @@ pre { margin: 0; padding: 10px; border-radius: 8px; background: #0d1412; border:
   <header>
     <div class="brand">
       <h1>Foxhole <span>HQ</span></h1>
-      <span class="hq">prajesh's HQ · 3 departments</span>
-      <span class="live"><i></i>Live</span>
+      <span class="hq" id="hq">prajesh's HQ · 3 departments</span>
+      <span class="live" id="conn"><i></i><span>Live</span></span>
     </div>
     <div class="controls">
       <div class="chip"><span class="lvl-badge" id="lvl">Lv 7</span><div class="bar"><b id="xpbar"></b></div><span class="mono" id="xptext"></span></div>
@@ -188,16 +232,23 @@ pre { margin: 0; padding: 10px; border-radius: 8px; background: #0d1412; border:
       <div class="cam">
         <button type="button" id="zoom-out" aria-label="Zoom out">−</button>
         <button type="button" id="zoom-in" aria-label="Zoom in">+</button>
-        <button type="button" id="overview">Whole floor</button>
+        <button type="button" id="overview" aria-label="Fit all dens to the screen" title="Fit all dens (0)" aria-pressed="true"><svg viewBox="0 0 20 20" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 3H3v14h4M13 3h4v14h-4"/></svg></button>
       </div>
-      <div class="hint" id="hint">Drag to walk around · scroll or pinch to zoom · click a department to visit it</div>
+      <div class="hint" id="hint">Drag to walk around · scroll or pinch to zoom · click a department to visit it · [ ] or 0 fits every den</div>
     </div>
     <aside class="rail">
+      <section class="panel den-panel" id="den-panel" hidden aria-label="Den tasks and pull requests">
+        <div class="den-head"><span class="swatch" id="den-swatch"></span><strong id="den-name"></strong><span class="chip-src" id="den-source"></span>
+          <button type="button" class="mini" id="den-refresh" aria-label="Refresh">↻</button><button type="button" class="mini" id="den-close" aria-label="Close den panel">×</button></div>
+        <div class="den-tabs" id="den-tabs" role="tablist"><button type="button" role="tab" data-tab="tasks" aria-selected="true">Tasks</button><button type="button" role="tab" data-tab="prs" aria-selected="false">Pull requests</button></div>
+        <div class="den-list" id="den-list"></div>
+        <p class="den-hint">Drag a task onto a fox, or use Assign to…</p>
+      </section>
       <section class="panel">
         <h2>Departments</h2>
         <div class="depts" id="depts"></div>
       </section>
-      <section class="panel">
+      <section class="panel" id="fox-panel">
         <h2>Selected fox</h2>
         <div class="d-head"><span class="dot" id="d-dot"></span><strong id="d-name"></strong><span class="src" id="d-src"></span></div>
         <div class="d-quest" id="d-quest"></div>
@@ -221,30 +272,80 @@ pre { margin: 0; padding: 10px; border-radius: 8px; background: #0d1412; border:
   </section>
 </div>
 <div class="toasts" id="toasts"></div>
+<div class="confirm" id="confirm" role="dialog" aria-modal="true" aria-labelledby="confirm-title" hidden>
+  <div class="confirm-box"><h3 id="confirm-title"></h3><pre id="confirm-text"></pre><p id="confirm-when"></p>
+    <div class="confirm-actions"><button type="button" class="btn ghost" id="confirm-no">Cancel</button><button type="button" class="btn primary" id="confirm-ok">Assign</button></div></div>
+</div>
 
 <script>
 (() => {
 const TAU = Math.PI * 2, R = Math.random, rnd = (a, b) => a + R() * (b - a);
 const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
+// ?live (what `foxhole serve` opens) follows your real sessions; without it the den plays the scripted demo
+const LIVE = new URLSearchParams(location.search).has('live');
 const css = getComputedStyle(document.documentElement);
 const V = n => css.getPropertyValue(n).trim();
 const COL = { fg: V('--fg'), muted: V('--muted'), ok: V('--ok'), alert: V('--alert'), fox: V('--fox'), err: V('--err') };
 const FONT = '"Bricolage Grotesque", system-ui, sans-serif', MONO = '"JetBrains Mono", ui-monospace, monospace';
-const TW = 64, TH = 32, COLS = 11, ROWS = 9, WH = 100, PART = 26;
+const TW = 64, TH = 32;
 const P = { floorA: '#6f4d36', floorB: '#674731', hallA: '#4b433b', hallB: '#463e36', wallR: '#432f24', wallL: '#382820', base: '#2b1e17', part: '#5a4536',
   desk: '#a0714a', mon: '#20272b', scrOn: '#9be6ff', scrDim: '#2a4450', shelf: '#7b5337', rack: '#2c3339', cush: '#b98e66', cushIn: '#dcb991',
-  dirt: '#56392a', hole: '#140d0a', brass: '#c99a4a', cork: '#a77d52', pot: '#b0613f', leaf: '#5f9a5a', gold: '#e7b84a', couch: '#3f6f78', lobby: '#7a5c42', lobbyB: '#735640' };
+  dirt: '#56392a', hole: '#140d0a', brass: '#c99a4a', cork: '#a77d52', pot: '#b0613f', leaf: '#5f9a5a',
+  grassA: '#35512c', grassB: '#314b29', blade: '#4b7039', soil: '#4a3323',
+  bank: '#5d5034', water: '#2f5f78', ripple: 'rgba(190,225,240,.45)',
+  lobby: '#7a5c42', lobbyB: '#735640', couch: '#3f6f78', gold: '#e7b84a' };
 
-/* ---------- the floor plan: every repo is a department room off shared corridors ---------- */
-const BW = 24, BH = 20;
-const SLOTS = [[0, 0], [13, 0], [0, 11]];
-const LOBBY = { ox: 13, oy: 11, name: 'Commons' };
+/* ---------- the floor plan: a pyramid of rooms dug into a sloping hillside ----------
+   The rooms tile one rectangle of CELL_W x CELL_H cells, with the Commons in the back corner. The grid grows a row, then a
+   column, then a row again, forever: 1x1, 2x1, 2x2, 3x2, 3x3, 4x3, 4x4... Each ring of cells (those at the same distance
+   from the back corner) sits a step lower than the one before, so the floors descend toward the viewer. A den that has
+   not opened yet leaves its cell to the room on its left in the same row, so the footprint is always a full rectangle.
+   Only the two back sides of the rectangle are walled; between rooms there is a retaining wall down to a lower floor or
+   a low divider on the same floor. The lawn is one gentle slope: the grass drops SLOPE px for every tile toward the viewer. */
+const CELL_W = 13, CELL_H = 11;   // one grid cell, in tiles: a repo room, and the Commons
+const SLOPE = 2.4;                // px the grass drops per tile toward the viewer
+const G_TOP = 55;                 // grass height at the world origin
+const groundZ = (x, y) => G_TOP - SLOPE * (x + y);
+const CM_EXTRA = 20;              // the Commons floor sits this far below the grass at the back corner... plus the wall above
+const RING_DROP = 40;             // each ring of rooms sits this far below the one behind it
+const ringZ = ring => -CM_EXTRA - RING_DROP * ring;
+const GRID_MAX = 6;               // rooms the grid has space for along a side; later repos' foxes wait in the Commons
+const SLOT_CAP = GRID_MAX * GRID_MAX - 1;
+// the cells dens take, in opening order: a row (left to right), then a column (alternately bottom to top and top to bottom)
+function growthCells(count) {
+  const out = []; let rows = 1, cols = 1;
+  for (let step = 1; out.length < count; step++) {
+    if (step % 2) { for (let i = 0; i < cols; i++) out.push([i, rows]); rows++; }
+    else {
+      const col = Array.from({ length: rows }, (_, j) => j);
+      (cols % 2 ? col.reverse() : col).forEach(j => out.push([cols, j]));
+      cols++;
+    }
+  }
+  return out.slice(0, count);
+}
+const DEN_CELLS = growthCells(SLOT_CAP);
+const slotCell = n => DEN_CELLS[n];
+// the columns and rows needed to hold the Commons and the dens in these slots
+const footprintOf = slots => slots.reduce(([c, r], n) => [Math.max(c, slotCell(n)[0] + 1), Math.max(r, slotCell(n)[1] + 1)], [1, 1]);
+const DEN_HOLE = { side: 'back', at: 7.1 };       // a top-row den's way in: a hole in its back wall, under a hole in the grass
+const LEFT_HOLE = { side: 'left', at: 8.7 };      // a den on the left edge uses its left wall
+const COMMONS_HOLE = { side: 'back', at: 6.0 };
+const HOLE_X = 7.1;               // the hole, where the Task station sits
+const HATCH_Y = 0.9;              // an inner den's hatch sits this far from its back edge
+const GRASS_HOLE_OFF = 0.8;       // a grass hole sits this far out from its wall, straight above the wall hole
+const LIP = 8;                    // the thickness of a room's floor slab, seen along its open front edges
+const DIVIDER_H = 16;             // a low wall between rooms on the same floor
 const RUGS = [['#3d5a80', '#5b7fa8'], ['#8d3c2f', '#b2563f'], ['#3f6b4f', '#5f9270']];
+const ROOM_ANIM = 1.1;            // seconds for a room to open or close
+const ROOM_IDLE = 5 * 60;         // seconds without activity before a room (with every fox asleep) disappears
+const DIVE_T = 0.55;              // seconds for a fox to disappear down the grass hole
+const HOP_T = 0.7;                // seconds for the jump-and-spin when a fox is tapped
 
 /* ---------- geometry; OFF shifts a room's local tiles onto the floor ---------- */
-let OFF = [0, 0];
+let OFF = [0, 0], OFFZ = 0; // OFFZ lifts or sinks everything drawn for a room on a lower level
 const isoAbs = (x, y, z = 0) => [(x - y) * TW / 2, (x + y) * TH / 2 - z];
-const iso = (x, y, z = 0) => isoAbs(x + OFF[0], y + OFF[1], z);
+const iso = (x, y, z = 0) => isoAbs(x + OFF[0], y + OFF[1], z + OFFZ);
 function tone(h, f) { const n = parseInt(h.slice(1), 16); const c = [n >> 16, n >> 8 & 255, n & 255].map(v => Math.min(255, Math.round(v * f))); return `rgb(${c})`; }
 const B = c => ({ top: tone(c, 1.12), left: tone(c, 0.9), right: tone(c, 0.72) });
 let ctx = null, view = null;
@@ -261,8 +362,7 @@ function rrect(x, y, w, h, r) { ctx.beginPath(); ctx.moveTo(x + r, y); ctx.arcTo
 let seed = 7; const srand = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
 const BOOKC = ['#c2563f', '#4f7cac', '#d9a441', '#5c8f5a', '#8b5a9e', '#e2d3b5', '#3f6f78'];
 const books = [];
-[6, 23, 40, 57].forEach(z => { let y = 3.07; while (y < 4.85) { const w = 0.09 + srand() * 0.1; books.push({ y, w, z, h: 11 + srand() * 5, c: BOOKC[Math.floor(srand() * BOOKC.length)] }); y += w + 0.015; } });
-const stars = Array.from({ length: 12 }, () => [srand(), 40 + srand() * 38, srand() * 6]);
+[6, 23, 40, 57].forEach(z => { let y = 3.82; while (y < 5.1) { const w = 0.09 + srand() * 0.1; books.push({ y, w, z, h: 11 + srand() * 5, c: BOOKC[Math.floor(srand() * BOOKC.length)] }); y += w + 0.015; } });
 
 const norm = rows => { const w = Math.max(...rows.map(r => r.length)); return rows.map(r => r.padEnd(w, '.')); };
 const SPR = {
@@ -283,6 +383,11 @@ const ICON = {
   task: ['x.x.x', '.....', '.xxx.', '.xxx.'],
   quest: ['xxxxxx', 'x....x', 'x.xx.x', 'x....x', 'xxxxxx'],
   bang: ['x', 'x', 'x', '.', 'x'],
+  think: ['xx.xx.xx', 'xx.xx.xx'],
+  game: ['xxxxxxx', 'x.xxx.x', 'xxxxxxx', '.x...x.'],
+  food: ['.xxx.', 'xx.xx', 'xxxxx', '.xxx.'],
+  drink: ['xxxx.', 'x..xx', 'x..xx', 'xxxx.'],
+  pong: ['xx...', 'xx..x', '.x...'],
 };
 const INK = '#1b1714', PX = 2.4;
 function pix(rows, ox, oy, pal, flip, p) {
@@ -303,20 +408,21 @@ function bubble(cx, bottom, icon, bg, p) {
 }
 
 /* ---------- stations: each branch gets a corner of the room with its own rug and desks; the shared stations hug the walls ---------- */
-const BAREAS = [[3.0, 1.8], [5.8, 1.8], [3.0, 4.4], [5.8, 4.4]];
+// Branch corners and stations stay out of the room's corners: whichever corner meets the Commons is cut away.
+const BAREAS = [[1.9, 4.9], [4.5, 4.9], [7.1, 4.9], [9.7, 4.9]];
 const BAW = 2.4, BAH = 2.2, DW = 1.0, DD = 0.6;
 const BCOL = [['#2f4a6b', '#4f78a6'], ['#5d3a6e', '#8b5aa8'], ['#2f5a40', '#4f8f66'], ['#6b4a22', '#a8783a']];
 const areaOf = b => ({ x: BAREAS[b.slot][0], y: BAREAS[b.slot][1] });
 function deskRect(f) { const a = areaOf(f.den.branches[f.bIdx]); return { x: a.x + 0.15 + f.bDesk * 1.1, y: a.y + 0.2 }; }
 const deskSpot = f => { const r = deskRect(f); return { x: r.x + DW / 2, y: r.y + DD + 0.5, face: 1 }; };
 const ST = {
-  shelf: i => [{ x: 1.05, y: 3.6, face: -1 }, { x: 1.1, y: 4.6, face: -1 }, { x: 1.6, y: 4.1, face: -1 }][i % 3],
-  rack: i => [{ x: 1.25, y: 6.45, face: -1 }, { x: 1.45, y: 5.55, face: -1 }, { x: 1.8, y: 7.1, face: -1 }][i % 3],
-  window: i => [{ x: 8.55, y: 1.75, face: 1 }, { x: 9.6, y: 2.4, face: 1 }][i % 2],
-  burrow: i => [{ x: 8.45, y: 6.4, face: 1 }, { x: 8.2, y: 7.05, face: 1 }][i % 2],
-  bed: k => ({ x: [2.4, 4.3, 6.2, 8.0][k % 4], y: 7.75, face: 1 }),
+  shelf: i => [{ x: 1.05, y: 4.0, face: -1 }, { x: 1.1, y: 4.9, face: -1 }, { x: 1.6, y: 4.45, face: -1 }][i % 3],
+  rack: i => [{ x: 1.25, y: 6.3, face: -1 }, { x: 1.5, y: 5.8, face: -1 }, { x: 1.8, y: 7.0, face: -1 }][i % 3],
+  window: i => [{ x: 5.0, y: 2.3, face: 1 }, { x: 6.0, y: 2.5, face: 1 }][i % 2],
+  burrow: i => [{ x: HOLE_X - 0.6, y: 1.0, face: 1 }, { x: HOLE_X + 0.6, y: 1.05, face: -1 }][i % 2],
+  bed: k => ({ x: [5.8, 7.0, 8.2][k % 3], y: 9.6, face: 1 }),
 };
-const BASE_BLOCK = ['0,3', '0,4', '0,5', '0,6', '9,1', '9,6', '10,6', '9,7', '10,7', '10,0', '2,0', '3,0'];
+const BASE_BLOCK = ['0,3', '0,4', '0,5', '0,6', '5,1', '11,5'];
 function rebuildBlocked(d) {
   d.blocked = new Set(BASE_BLOCK);
   d.foxes.filter(f => !f.isCub).forEach(f => {
@@ -331,7 +437,7 @@ function findPath(d, ax, ay, bx, by) {
     const [x, y] = q.shift(); if (x === g[0] && y === g[1]) break;
     for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
       const nx = x + dx, ny = y + dy, nk = k(nx, ny);
-      if (nx < 0 || ny < 0 || nx >= COLS || ny >= ROWS || prev.has(nk)) continue;
+      if (nx < 0 || ny < 0 || nx >= d.w || ny >= d.h || prev.has(nk)) continue;
       if (d.blocked.has(nk) && !(nx === g[0] && ny === g[1])) continue;
       prev.set(nk, [x, y]); q.push([nx, ny]);
     }
@@ -350,6 +456,9 @@ const TOOL = {
   Edit: { st: 'desk', act: 'type', d: [4, 6] }, Write: { st: 'desk', act: 'type', d: [3.5, 5] },
   Bash: { st: 'rack', act: 'bash', d: [3, 4.2] }, WebSearch: { st: 'window', act: 'gaze', d: [3, 4] },
   Task: { st: 'burrow', act: 'task', d: [1.8, 2.4] },
+  // tools the demo never scripts but real sessions use
+  Glob: { st: 'shelf', act: 'read', d: [2, 3] }, WebFetch: { st: 'window', act: 'gaze', d: [3, 4] },
+  Agent: { st: 'burrow', act: 'task', d: [1.8, 2.4] }, NotebookEdit: { st: 'desk', act: 'type', d: [4, 6] },
 };
 const RATES = { 'claude-sonnet': [3, 15], 'claude-opus': [5, 25], 'claude-haiku': [1, 5], 'codex': [1.25, 10] };
 const DEN_DEFS = [
@@ -379,25 +488,35 @@ const DEN_DEFS = [
       { title: 'Dead-letter queue for webhooks', files: ['src/webhooks/dlq.ts', 'src/webhooks/retry.ts'], cmds: ['npm test dlq', 'npm run build'], q: 'dead letter queue pattern', grep: 'maxAttempts' } ] } ] },
 ];
 const rid = () => Math.random().toString(16).slice(2, 6);
+// walking pace by model tier: the more capable the model, the quicker its fox
+const MODEL_PACE = [['fable', 3.3], ['opus', 3.0], ['sonnet', 2.5], ['haiku', 1.9]];
+const DEFAULT_PACE = 2.4;
+const paceFor = model => (MODEL_PACE.find(([tier]) => (model || '').includes(tier)) || [null, DEFAULT_PACE])[1];
 function makeFox(o, den) {
   const f = Object.assign({ den, x: 5, y: 6.6, path: [], travel: false, target: null, dir: 1, state: 'idle', act: null,
     timer: 0, cur: null, steps: [], tIn: 0, tOut: 0, qIn: 0, qOut: 0, events: [], quest: null, qi: 0, done: 0,
-    qTools: 0, qErrors: 0, phase: R() * 10, scale: 1, scroll: 0, speed: 2.4, zT: 0,
+    qTools: 0, qErrors: 0, phase: R() * 10, scale: 1, scroll: 0, zT: 0,
     machine: 'm_8f2c', session: 's_' + rid() + rid() }, o);
+  f.speed = o.speed ?? paceFor(f.model);
   f.shade = f.arctic ? '#aeb9c2' : tone(f.fur, 0.82);
   f.cream = f.arctic ? '#ffffff' : '#f6e7cf';
   return f;
 }
 function addAgent(d, a) {
   let bIdx = d.branches.findIndex(b => b.name === a.branch);
-  if (bIdx < 0) { d.branches.push({ name: a.branch, slot: d.branches.length, col: BCOL[d.branches.length % 4], foxes: [] }); bIdx = d.branches.length - 1; }
+  if (bIdx < 0) { d.branches.push({ name: a.branch, slot: d.branches.length % BAREAS.length, col: BCOL[d.branches.length % 4], foxes: [] }); bIdx = d.branches.length - 1; }
   const br = d.branches[bIdx], f = makeFox({ ...a, bIdx, bDesk: br.foxes.length, bed: d.foxes.filter(o => !o.isCub).length % 4 }, d);
   br.foxes.push(f); d.foxes.push(f); rebuildBlocked(d);
   return f;
 }
-const DENS = DEN_DEFS.map((def, i) => {
-  const d = { id: 'd' + i, idx: i, repo: def.repo, name: def.repo.replace('github.com/', ''), ox: SLOTS[i][0], oy: SLOTS[i][1],
-    rug: RUGS[i], foxes: [], parts: [], branches: [], later: def.later || [] };
+// t runs 0→1 while a room opens (and back while it closes); grow is the eased share of its width on the floor
+function makeDen(repo, i) {
+  return { id: 'd' + i, idx: i, repo, name: repo.replace('github.com/', ''), ox: 0, oy: 0,
+    rug: RUGS[i % RUGS.length], foxes: [], parts: [], branches: [], later: [], open: false, t: 0, grow: 0, quiet: 0, slot: null,
+    w: CELL_W, h: CELL_H, z0: 0 };
+}
+const DENS = (LIVE ? [] : DEN_DEFS).map((def, i) => {
+  const d = { ...makeDen(def.repo, i), later: def.later || [] };
   def.agents.forEach(a => addAgent(d, a));
   d.foxes.forEach((f, j) => {
     if (f.asleep) { Object.assign(f, ST.bed(f.bed)); f.state = 'sleeping'; f.cur = { k: 'rest' }; f.timer = f.asleep; }
@@ -406,12 +525,62 @@ const DENS = DEN_DEFS.map((def, i) => {
   });
   return d;
 });
-const wpos = f => isoAbs(f.x + f.den.ox, f.y + f.den.oy);
+const wpos = f => isoAbs(f.x + f.den.ox, f.y + f.den.oy, (f.z || 0) + (f.den.z0 || 0));
+// A room's way in. A room on the back edge of the grid has a hole in its back (or left) wall; any other room has a hatch in
+// its floor, with its grass hole on the lawn behind the grid and a tunnel between them. `lawn` and `door` are room tiles.
+function holeOf(d) {
+  if (d.isCommons) return COMMONS_HOLE;
+  if (d.slot == null) return null;
+  if (d.oy === 0) return DEN_HOLE;
+  if (d.ox === 0) return LEFT_HOLE;
+  const row = Math.round(d.oy / CELL_H), lawnX = 2.2 + (row * 3.1) % 8.4;
+  return { side: 'floor', at: HOLE_X, lawn: [lawnX, -d.oy - GRASS_HOLE_OFF], door: [HOLE_X, HATCH_Y] };
+}
+// a point by a room's hole: `along` tiles along it, `out` tiles out from the wall (negative = on the lawn)
+function byHole(h, along, out) {
+  if (h.side === 'back') return [h.at + along, out];
+  if (h.side === 'left') return [out, h.at + along];
+  return out < 0 ? [h.lawn[0] + along, h.lawn[1] + out + GRASS_HOLE_OFF] : [h.door[0] + along, h.door[1] + out];
+}
+// the grass height above a room's floor at a point of the room (tiles), i.e. how tall its back wall stands there
+const grassAt = (d, lx, ly) => groundZ(d.ox + lx, d.oy + ly) - d.z0;
+const wallTop = (d, lx, ly) => Math.max(0, grassAt(d, lx, ly));
+// a wall-mounted thing's height, kept under the wall's top so it never pokes out into the grass
+const fit = (d, lx, ly, h) => Math.min(h, wallTop(d, lx, ly) - 4);
+// the top of a room's hole shaft: the grass above its floor
+const shaftTop = d => { const h = holeOf(d); return h && h.side !== 'floor' ? wallTop(d, ...byHole(h, 0, 0)) : 0; };
+// where a fox steps into or out of a room: just inside its wall hole
+const doorOf = d => byHole(holeOf(d), 0, 0.3);
+// a new fox trots across the lawn, dives down its room's grass hole and pops out of the wall hole
+function enterViaHoles(f, then) {
+  // a new room claims its place now; with every place taken, the fox waits in the Commons instead
+  if (!f.den.isCommons && !ensureSlot(f.den)) { if (then) then(f); return; }
+  const h = holeOf(f.den);
+  const [sx, sy] = byHole(h, 2.2 + R() * 1.5, -GRASS_HOLE_OFF - 0.4 - R() * 0.6), [gx, gy] = byHole(h, 0, -GRASS_HOLE_OFF);
+  Object.assign(f, { x: sx, y: sy, z: grassAt(f.den, sx, sy), onGrass: true, path: [[gx, gy]], travel: true, state: 'walking', cur: { k: 'dive' }, entering: true, afterEntry: then });
+}
+function popOut(f) {
+  const h = holeOf(f.den), [px, py] = byHole(h, 0, 0.15), [wx, wy] = byHole(h, 0, 1.1);
+  Object.assign(f, { x: px, y: py, z: 0, onGrass: false, path: [[wx, wy]], travel: true, state: 'walking', cur: { k: 'popOut' } });
+  burst(f, 'smoke', 8);
+}
+
+/* ---------- climbing: foxes scramble up and down the shaft of a room's hole ---------- */
+const CLIMB_SPEED = 45; // px per second up or down a shaft
+function startClimb(f, z, done) { Object.assign(f, { state: 'climbing', travel: false, path: [], climbTo: z, onClimbed: done }); }
+function climbTick(f, dt) {
+  const step = CLIMB_SPEED * dt, left = f.climbTo - (f.z || 0);
+  f.z = Math.abs(left) <= step ? f.climbTo : (f.z || 0) + Math.sign(left) * step;
+  if (f.z !== f.climbTo) return;
+  f.state = 'idle';
+  const done = f.onClimbed; f.onClimbed = null;
+  if (done) done(f);
+}
 function join(d, a) {
   const isNew = !d.branches.some(b => b.name === a.branch);
   const f = addAgent(d, a), mate = d.branches[f.bIdx].foxes.find(o => o !== f);
-  f.x = 5.2; f.y = 8.6; f.cur = { k: 'boot' }; f.timer = 0.4; f.steps = [{ k: 'start' }];
-  const s = deskSpot(f); burst({ den: d, x: s.x, y: s.y - 0.9 }, 'smoke', 12);
+  f.steps = [{ k: 'start' }];
+  enterViaHoles(f, () => { f.cur = { k: 'boot' }; f.timer = 0.4; });
   toast(`New agent in ${d.name}`, isNew ? `${f.name} started ${a.branch} and got a new branch corner.` : `${f.name} joined ${a.branch} and got the desk next to ${mate.name}.`);
   buildDepts();
 }
@@ -440,7 +609,7 @@ function planQuest(f) {
 const dir = p => p.split('/').slice(-2, -1)[0] || p;
 
 /* ---------- simulation ---------- */
-let simT = 0, speed = 1, paused = false, xp = 520, level = 7, trophies = 3;
+let simT = 0, speed = 1, paused = false, xp = 520, level = 7;
 let hideTargets = false, selected = null;
 const seen = new Set();
 const xpNeed = l => 300 + l * 90;
@@ -451,6 +620,7 @@ function spotFor(f, st) {
   const n = f.den.foxes.filter(o => o !== f && o.target && o.target.st === st).length;
   return { ...ST[st](n), st };
 }
+const rugSpot = () => ({ x: rnd(5, 9), y: rnd(7.8, 8.4), face: R() < 0.5 ? 1 : -1, st: 'rug' });
 function goTo(f, sp) { f.target = sp; f.path = findPath(f.den, f.x, f.y, sp.x, sp.y); f.travel = true; f.state = 'walking'; }
 function usage(f) {
   const u = { inputTokens: Math.round(rnd(900, 4200)), outputTokens: Math.round(rnd(120, 900)), model: f.model };
@@ -458,6 +628,7 @@ function usage(f) {
   return u;
 }
 function emit(f, type, extra = {}) {
+  if (LIVE) return; // live foxes only act out real events; they never make any up
   const ev = { v: 1, ts: new Date().toISOString(), source: f.source, machineId: f.machine, sessionId: f.session,
     parentSessionId: f.parent ? f.parent.session : null, type, ...extra, repo: f.den.repo, branch: (f.parent || f).branch };
   const owner = f.parent || f;
@@ -486,15 +657,15 @@ function begin(f, s) {
     }
     case 'stop':
       f.state = 'celebrating'; f.timer = 2.8; f.done++;
-      emit(f, 'session.stop', { status: 'ok', usage: { inputTokens: f.qIn, outputTokens: f.qOut, model: f.model } });
+      emit(f, 'turn.end', { status: 'ok', usage: { inputTokens: f.qIn, outputTokens: f.qOut, model: f.model } });
       addXp(30 + f.qTools * 9 + (f.qErrors ? 0 : 20), f);
       burst(f, 'confetti', reduceMotion ? 10 : 46);
       if (!seen.has('first')) { seen.add('first'); toast('Achievement: First Quest', `${f.name} closed out “${f.quest.title}” in ${f.den.name}.`); }
       else if (!f.qErrors && !seen.has('zero')) { seen.add('zero'); toast('Achievement: Zero-Error Shift', `${f.name} finished a quest with no tool errors.`); }
       break;
-    case 'wander': goTo(f, { x: rnd(2.6, 7.6), y: rnd(6.4, 7.0), face: R() < 0.5 ? 1 : -1, st: 'rug' }); break;
+    case 'wander': goTo(f, rugSpot()); break;
     case 'rest': goTo(f, spotFor(f, 'bed')); break;
-    case 'home': goTo(f, spotFor(f, 'burrow')); break;
+    case 'home': { const [x, y] = doorOf(f.den); goTo(f, { x, y, st: 'door' }); break; }
   }
 }
 function arrive(f) {
@@ -503,10 +674,20 @@ function arrive(f) {
     if (s.perm) { f.state = 'waiting'; f.waitSince = simT; emit(f, 'permission.request', { tool: s.tool, target: s.target, status: 'waiting' }); }
     else startWork(f, s);
   } else if (s.k === 'wander') { f.state = 'idle'; f.target = null; f.timer = rnd(1.4, 2.6); }
+  else if (s.k === 'desk') { f.state = 'idle'; f.target = null; }
   else if (s.k === 'rest') { f.state = 'sleeping'; f.target = null; f.timer = rnd(18, 30); f.steps = [{ k: 'start' }]; emit(f, 'session.end'); }
   else if (s.k === 'home') { emit(f, 'subagent.stop', { status: 'ok' }); burst(f, 'smoke', 6); f.den.foxes = f.den.foxes.filter(o => o !== f); }
+  else if (s.k === 'dive') { f.state = 'diving'; f.dive = 0; }
+  else if (s.k === 'exit') startClimb(f, shaftTop(f.den), () => Object.assign(f, { away: true, viaHole: true, state: 'sleeping', cur: null, target: null }));
+  else if (s.k === 'leave') startClimb(f, shaftTop(f.den), () => { burst(f, 'smoke', 8); COMMONS.foxes = COMMONS.foxes.filter(o => o !== f); });
+  else if (s.k === 'pace') { f.state = 'idle'; f.timer = rnd(1, 2.2); }
+  else if (s.k === 'hang') { Object.assign(f, { state: s.h.state, act: s.h.act || null, target: null, z: s.h.z || 0, timer: s.h.state === 'sleeping' ? rnd(14, 26) : rnd(8, 18) }); }
+  else if (s.k === 'popOut') {
+    Object.assign(f, { state: 'idle', cur: null, target: null, entering: false });
+    const then = f.afterEntry; f.afterEntry = null; if (then) then(f);
+  }
 }
-function startWork(f, s) { f.state = 'working'; f.act = s.act; f.timer = s.dur; if (s.tool === 'Task') spawnCub(f); }
+function startWork(f, s) { f.state = 'working'; f.act = s.act; f.timer = s.dur; if (s.tool === 'Task' && !f.live) spawnCub(f); }
 function fail(f) { f.qErrors++; f.state = 'stumble'; f.timer = 1.2; f.cur = { k: 'stumbled' }; f.target = null; burst(f, 'smoke', 10); }
 function timerDone(f) {
   const s = f.cur;
@@ -519,9 +700,12 @@ function timerDone(f) {
   if (f.state !== 'sleeping') { f.state = 'idle'; f.act = null; }
 }
 function advance(f) { const s = f.steps.shift(); if (s) begin(f, s); else if (!f.isCub) begin(f, { k: 'rest' }); }
+function makeCub(p, x, y) {
+  return makeFox({ name: p.name, source: p.source, model: p.model, fur: p.fur, arctic: p.arctic, isCub: true, parent: p,
+    quest: p.quest, scale: 0.6, speed: 3.3, x, y, machine: p.machine }, p.den);
+}
 function spawnCub(p) {
-  const c = makeFox({ name: p.name, source: p.source, model: p.model, fur: p.fur, arctic: p.arctic, isCub: true, parent: p,
-    quest: p.quest, scale: 0.6, speed: 3.3, x: 9.25, y: 6.75, machine: p.machine }, p.den);
+  const c = makeCub(p, ...doorOf(p.den));
   c.steps = [{ k: 'tool', tool: 'Read', target: p.quest.files[1] }, { k: 'tool', tool: 'Grep', target: p.quest.grep }, { k: 'tool', tool: 'Bash', target: 'ls ' + dir(p.quest.files[1]) }, { k: 'home' }];
   c.timer = 0.6; c.cur = { k: 'boot' };
   p.den.foxes.push(c); burst(c, 'smoke', 6);
@@ -540,7 +724,7 @@ function addXp(n, f) {
   xp += n;
   const [sx, sy] = wpos(f);
   f.den.parts.push({ kind: 'xp', x: sx, y: sy - 70, vx: 0, vy: -26, life: 2.2, max: 2.2, text: `+${n} XP` });
-  while (xp >= xpNeed(level)) { xp -= xpNeed(level); level++; trophies = Math.min(6, trophies + 1); toast(`Level ${level}`, 'A new trophy went into the Commons cabinet.'); }
+  while (xp >= xpNeed(level)) { xp -= xpNeed(level); level++; toast(`Level ${level}`, 'Your HQ levelled up.'); }
 }
 function burst(f, kind, n) {
   const [sx, sy] = wpos(f), colors = [COL.fox, COL.alert, COL.ok, '#8fc4ff', '#f3a0c4'];
@@ -550,10 +734,11 @@ function burst(f, kind, n) {
   }
 }
 function tick(dt) {
-  for (const d of DENS) {
+  for (const d of [COMMONS, ...DENS]) {
     for (const j of d.later) if (!j.done && simT >= j.at) { j.done = true; join(d, j.agent); }
     for (const f of [...d.foxes]) {
       if (f.scroll > 0) f.scroll -= dt;
+      if (f.state === 'working' || (f.turnOpen && f.cur?.k === 'pace')) emitGlyph(d, f, dt);
       if (f.state === 'sleeping') { f.zT -= dt; if (f.zT <= 0) { f.zT = 1.3; const [sx, sy] = wpos(f); d.parts.push({ kind: 'z', x: sx + 8, y: sy - 20, vx: 8, vy: -16, life: 2.2, max: 2.2 }); } }
       if (f.travel) {
         const p = f.path[0], dx = p[0] - f.x, dy = p[1] - f.y, dist = Math.hypot(dx, dy), step = f.speed * dt;
@@ -562,8 +747,13 @@ function tick(dt) {
           f.x = p[0]; f.y = p[1]; f.path.shift();
           if (!f.path.length) { f.travel = false; if (f.target && f.target.face) f.dir = f.target.face; arrive(f); }
         } else { f.x += dx / dist * step; f.y += dy / dist * step; }
+        if (f.onGrass) f.z = grassAt(f.den, f.x, f.y); // across the lawn, a fox follows the slope
         continue;
       }
+      if (f.state === 'climbing') { climbTick(f, dt); continue; }
+      if (f.state === 'diving') { f.dive += dt; if (f.dive >= DIVE_T) popOut(f); continue; }
+      if (f.live) { liveTick(f, dt); continue; }
+      if (f.lounger) { loungerTick(f, dt); continue; }
       if (f.state === 'waiting') { if (simT - f.waitSince > 25) decide(f, true); continue; }
       if (f.timer > 0) { f.timer -= dt; if (f.timer <= 0) timerDone(f); continue; }
       if (!f.cur) advance(f);
@@ -572,90 +762,285 @@ function tick(dt) {
       const p = d.parts[i];
       p.x += p.vx * dt; p.y += p.vy * dt; p.life -= dt;
       if (p.kind === 'confetti') { p.vy += 300 * dt; p.rot += dt * 8; }
+      if (p.kind === 'dust') { p.vx *= 1 - 1.5 * dt; p.vy *= 1 - 1.2 * dt; }
       if (p.life <= 0) d.parts.splice(i, 1);
     }
   }
+  layoutRooms(dt);
+  syncLoungers();
+  tickWildlife(dt);
+}
+const easeOutBack = t => 1 + 2.7 * (t - 1) ** 3 + 1.7 * (t - 1) ** 2;
+// Opens a room as soon as one of its foxes is awake and closes it once they all sleep and nothing has happened
+// there for ROOM_IDLE; packs open rooms left to right. Live rooms measure from their last event, demo rooms
+// from when the last fox fell asleep.
+function idleFor(d) {
+  if (!LIVE) return d.quiet;
+  const last = Math.max(0, ...d.foxes.map(f => f.lastAt || 0));
+  return (Date.now() - last) / 1000;
+}
+// Every placed room's rectangle: its own cell, plus the cells to its right that no den has taken yet
+function placeRooms() {
+  const placed = DENS.filter(d => d.slot != null);
+  const [cols, rows] = footprintOf(placed.map(d => d.slot));
+  const owner = new Map([['0,0', COMMONS], ...placed.map(d => [slotCell(d.slot).join(','), d])]);
+  for (let j = 0; j < rows; j++) {
+    const runs = [];
+    for (let i = 0; i < cols; i++) {
+      const room = owner.get(i + ',' + j);
+      if (room) runs.push({ room, i, span: 1 }); else if (runs.length) runs[runs.length - 1].span++;
+    }
+    runs.forEach(({ room, i, span }) => Object.assign(room, { ox: i * CELL_W, oy: j * CELL_H, w: span * CELL_W, h: CELL_H, z0: ringZ(Math.max(i, j)) }));
+  }
+}
+// a den whose cell already lies inside the grid just takes it over from its neighbour, with no digging
+function coveredBefore(slot) {
+  const [cols, rows] = footprintOf(DENS.filter(o => o.slot != null && o.slot < slot).map(o => o.slot)), [i, j] = slotCell(slot);
+  return i < cols && j < rows;
+}
+function layoutRooms(dt) {
+  // a room closes only once no later slot is in use, so the used slots stay an unbroken run and the grid stays a rectangle
+  const lastSlot = Math.max(-1, ...DENS.filter(d => d.slot != null).map(d => d.slot));
+  for (const d of DENS) {
+    const active = d.foxes.some(f => !f.isCub && f.state !== 'sleeping');
+    d.quiet = active ? 0 : d.quiet + dt;
+    const open = active || idleFor(d) < ROOM_IDLE || (d.slot != null && d.slot < lastSlot);
+    const before = d.slot;
+    if (open && d.slot == null) d.slot = freeSlot(); // stays null while every slot is taken
+    if (d.slot !== before) placeRooms();
+    if (open !== d.open) { d.open = open; d.landed = false; }
+    const instant = d.slot != null && coveredBefore(d.slot);
+    d.t = instant ? (open ? 1 : 0) : Math.min(1, Math.max(0, d.t + (open && d.slot != null ? dt : -dt) / ROOM_ANIM));
+    d.grow = open ? easeOutBack(d.t) : d.t ** 3;
+    if (open && d.slot != null && !d.landed && d.t >= LAND_T) { d.landed = true; landDust(d); }
+    if (!open && d.t === 0) { d.slot = null; placeRooms(); }
+  }
+}
+function freeSlot() {
+  const used = new Set(DENS.map(d => d.slot));
+  for (let n = 0; n < SLOT_CAP; n++) if (!used.has(n)) return n;
+  return null;
+}
+// a room about to be used again gets its slot right away, so its fox has a hole to come out of
+function ensureSlot(d) { if (d.slot == null) { d.slot = freeSlot(); placeRooms(); } return d.slot != null; }
+const openDens = () => DENS.filter(d => d.slot != null && d.grow > 0.01);
+const roomShown = d => d.slot != null && d.grow > 0.05;
+const depthOf = d => d.ox + d.w / 2 + d.oy + d.h / 2; // how far toward the viewer a room's centre lies
+
+/* ---------- drawing: rooms as basements ---------- */
+// a room's outline in tile coordinates, sampled along each edge, cached per size
+const EDGE_STEP = 0.5; // tiles between sampled points along a room's outline
+const pits = new Map();
+function pitOf(w, h) {
+  const key = w + 'x' + h;
+  if (pits.has(key)) return pits.get(key);
+  const corners = [[0, 0], [w, 0], [w, h], [0, h]];
+  const edge = corners.flatMap((p, i) => {
+    const q = corners[(i + 1) % 4], n = Math.ceil(Math.hypot(q[0] - p[0], q[1] - p[1]) / EDGE_STEP);
+    return Array.from({ length: n }, (_, k) => [p[0] + (q[0] - p[0]) * k / n, p[1] + (q[1] - p[1]) * k / n]);
+  });
+  const pit = { edge };
+  pits.set(key, pit);
+  return pit;
+}
+function addPath(pts, z, dx = 0, dy = 0) {
+  pts.forEach((p, i) => { const s = iso(p[0] + dx, p[1] + dy, z); if (i) ctx.lineTo(s[0], s[1]); else ctx.moveTo(s[0], s[1]); });
+  ctx.closePath();
+}
+const EARTH = { stone: '#5c4838', root: '#2c1d14', post: '#6b4a30', postDark: '#4f3523', blade: '#4b7039', ledge: '#8a6446' };
+// earth-wall details along a straight run: `topAt(u)` is the wall's height u tiles along it and `at(u, z)` maps a
+// position along it and a height to the screen; the wall slopes, so everything follows its top
+function wallDressing(len, topAt, at, hidden = () => false) {
+  for (let k = 0; k < len * 1.3; k++) {
+    const u = 0.9 + ((k * 0.77) % (len - 1.6)), z = 10 + ((k * 37) % 70);
+    if (z > topAt(u) - 14 || hidden(u)) continue;
+    const p = at(u, z); ell(p[0], p[1], 3.2, 2, EARTH.stone);
+  }
+  for (let k = 0; k < len / 1.6; k++) {
+    const u = 1.1 + k * 1.6 + ((k * 13) % 5) / 10, top = topAt(u);
+    if (top > 20 && !hidden(u)) line(at(u, top), at(u + 0.08, top - 12 - (k % 3) * 6), EARTH.root, 1.4);
+  }
+  [1.6, len / 2 - 0.6, len - 1.5].forEach(u => {
+    const top = topAt(u);
+    if (u < 1 || u > len - 1 || top < 26 || hidden(u)) return;
+    const b0 = at(u - 0.1, 0), b1 = at(u + 0.1, 0), t1 = at(u + 0.1, top - 4), t0 = at(u - 0.1, top - 4);
+    poly([b0, b1, t1, t0], EARTH.post); line(b1, t1, EARTH.postDark, 1.5);
+  });
+  for (let u = 0.8; u < len - 0.8 - 1e-6; u += 0.4) {
+    const v = Math.min(u + 0.4, len - 0.8), ta = topAt(u), tb = topAt(v);
+    if (Math.min(ta, tb) > 24 && !hidden((u + v) / 2)) poly([at(u, ta - 12), at(v, tb - 12), at(v, tb - 5), at(u, ta - 5)], EARTH.post);
+  }
+  for (let u = 0.6; u < len - 0.4; u += 0.45) if (!hidden(u)) { const top = topAt(u); line(at(u, top), at(u + 0.06, top - 5), EARTH.blade, 1.6); }
+}
+// A room dug into the slope. Along the back of the grid (its left and top sides) it has a retaining wall that follows the
+// grass down the hill. Along its other sides it is open: down to a lower neighbour a retaining face, beside a neighbour
+// on the same floor a low divider with a gap to walk through, and over the lawn the earth under its floor slab.
+// the rooms a neighbour can lean on, worked out once per frame instead of for every tile edge
+let solidCache = null;
+const solidRooms = () => (solidCache ??= [COMMONS, ...DENS.filter(o => o.slot != null && o.t >= 1)]);
+function roomAt(wx, wy) {
+  for (const o of solidRooms()) if (wx > o.ox && wx < o.ox + o.w && wy > o.oy && wy < o.oy + o.h) return o;
+  return undefined;
+}
+const DIVIDER_GAP = 2; // tiles left open halfway along a divider
+const nextTo = (d, lx, ly) => roomAt(d.ox + lx, d.oy + ly);
+function drawPitShell(d, floorA, floorB) {
+  const back = [
+    { len: d.w, leftish: false, nb: k => nextTo(d, k + 0.5, -0.5), p: k => [k, 0], q: k => [k + 1, 0], at: (u, z) => iso(u, 0.01, z), top: u => wallTop(d, u, 0) },
+    { len: d.h, leftish: true, nb: k => nextTo(d, -0.5, k + 0.5), p: k => [0, k], q: k => [0, k + 1], at: (u, z) => iso(0.01, u, z), top: u => wallTop(d, 0, u) },
+  ];
+  for (const side of back) {
+    if (Array.from({ length: side.len }, (_, k) => side.nb(k)).some(Boolean)) continue; // another room lies behind this side
+    for (let k = 0; k < side.len; k++) {
+      const [p, q] = [side.p(k), side.q(k)], tp = wallTop(d, ...p), tq = wallTop(d, ...q);
+      poly([iso(...p, 0), iso(...q, 0), iso(...q, tq), iso(...p, tp)], side.leftish ? P.wallL : P.wallR);
+      poly([iso(...p, 0), iso(...q, 0), iso(...q, Math.min(6, tq)), iso(...p, Math.min(6, tp))], P.base);
+      ctx.lineCap = 'round'; line(iso(...p, tp), iso(...q, tq), P.dirt, 4); ctx.lineCap = 'butt';
+    }
+    wallDressing(side.len, side.top, side.at);
+  }
+  ctx.save();
+  ctx.beginPath(); addPath(pitOf(d.w, d.h).edge, 0); ctx.clip();
+  poly([iso(0, 0), iso(d.w, 0), iso(d.w, d.h), iso(0, d.h)], floorB);
+  const light = new Path2D(); // the other colour of the checkerboard, every tile in one fill
+  for (let i = 0; i < d.w; i++) for (let j = (i + 1) % 2; j < d.h; j += 2) {
+    const a = iso(i, j), b = iso(i + 1, j), c = iso(i + 1, j + 1), e = iso(i, j + 1);
+    light.moveTo(a[0], a[1]); light.lineTo(b[0], b[1]); light.lineTo(c[0], c[1]); light.lineTo(e[0], e[1]); light.closePath();
+  }
+  ctx.fillStyle = floorA; ctx.fill(light);
+  // little light reaches the floor along a back wall
+  if (d.oy === 0 || d.ox === 0) {
+    const a = iso(0, 0), b = iso(2.2, 2.2), g = ctx.createLinearGradient(a[0], a[1], b[0], b[1]);
+    g.addColorStop(0, 'rgba(10,6,4,.45)'); g.addColorStop(1, 'rgba(10,6,4,0)');
+    ctx.fillStyle = g; ctx.fillRect(a[0] - 2000, a[1] - 400, 4000, 1200);
+  }
+  ctx.restore();
+  drawFrontEdges(d);
+  if (d.oy === 0 && !d.isCommons) drawLantern(d, 9.6);
+}
+// the right and bottom sides of a room: what stands between its floor and whatever lies beyond
+function drawFrontEdges(d) {
+  const sides = [
+    { len: d.h, nb: k => nextTo(d, d.w + 0.5, k + 0.5), p: k => [d.w, k], q: k => [d.w, k + 1], face: P.wallL },
+    { len: d.w, nb: k => nextTo(d, k + 0.5, d.h + 0.5), p: k => [k, d.h], q: k => [k + 1, d.h], face: P.wallR },
+  ];
+  for (const side of sides) {
+    for (let k = 0; k < side.len; k++) {
+      const [p, q] = [side.p(k), side.q(k)], n = side.nb(k);
+      if (n && n.z0 > d.z0 - 0.5 && !(Math.abs(n.z0 - d.z0) < 0.5)) continue; // a higher neighbour hides this edge
+      if (n && Math.abs(n.z0 - d.z0) < 0.5) {
+        const gap = side.len >= 6 && k >= Math.floor((side.len - DIVIDER_GAP) / 2) && k < Math.floor((side.len - DIVIDER_GAP) / 2) + DIVIDER_GAP;
+        if (gap) continue;
+        poly([iso(...p, 0), iso(...q, 0), iso(...q, DIVIDER_H), iso(...p, DIVIDER_H)], side.face);
+        ctx.lineCap = 'round'; line(iso(...p, DIVIDER_H), iso(...q, DIVIDER_H), P.dirt, 3); ctx.lineCap = 'butt';
+        continue;
+      }
+      // down to a lower neighbour, or down to the lawn
+      const lawn = groundZ(d.ox + p[0], d.oy + p[1]) - d.z0, drop = n ? d.z0 - n.z0 : Math.min(160, Math.max(LIP, -lawn + LIP));
+      poly([iso(...p, -drop), iso(...q, -drop), iso(...q, 0), iso(...p, 0)], n ? side.face : P.soil);
+      if (n) poly([iso(...p, -drop), iso(...q, -drop), iso(...q, 6 - drop), iso(...p, 6 - drop)], P.base);
+      line(iso(...p, 0), iso(...q, 0), EARTH.ledge, 2);
+    }
+  }
+}
+// A faint glass wall along the open front of each den, drawn over its contents: it reads as a cut through the ground, so the
+// den is clearly underground. It is GLASS_ALPHA opaque and stands at least GLASS_MIN_H tall, or as high as the grass there.
+const GLASS_ALPHA = 0.2, GLASS_MIN_H = 44;
+function drawGlassWalls(d) {
+  const sides = [
+    { len: d.h, nb: k => nextTo(d, d.w + 0.5, k + 0.5), p: k => [d.w, k], q: k => [d.w, k + 1] },
+    { len: d.w, nb: k => nextTo(d, k + 0.5, d.h + 0.5), p: k => [k, d.h], q: k => [k + 1, d.h] },
+  ];
+  ctx.globalAlpha = GLASS_ALPHA;
+  for (const side of sides) for (let k = 0; k < side.len; k++) {
+    if (side.nb(k)) continue;
+    const [p, q] = [side.p(k), side.q(k)], tp = Math.max(GLASS_MIN_H, grassAt(d, ...p)), tq = Math.max(GLASS_MIN_H, grassAt(d, ...q));
+    poly([iso(...p, 0), iso(...q, 0), iso(...q, tq), iso(...p, tp)], '#e9d6b4');
+  }
+  ctx.globalAlpha = 1;
+}
+// rooms back to front: one is drawn before the rooms it is behind, so a front edge never covers what lies in front of it
+const isBehind = (a, b) => (a.ox + a.w <= b.ox + 1e-6 && a.oy < b.oy + b.h && b.oy < a.oy + a.h) || (a.oy + a.h <= b.oy + 1e-6 && a.ox < b.ox + b.w && b.ox < a.ox + a.w);
+function backToFront(rooms) {
+  const sorted = [...rooms].sort((a, b) => depthOf(a) - depthOf(b)), out = [], seen = new Set();
+  const visit = r => { if (seen.has(r)) return; seen.add(r); sorted.forEach(o => { if (o !== r && isBehind(o, r)) visit(o); }); out.push(r); };
+  sorted.forEach(visit);
+  return out;
+}
+// a warm lantern hanging on the back wall, below its top
+function drawLantern(d, x) {
+  const z = Math.min(64, wallTop(d, x, 0) - 14);
+  if (z < 18) return;
+  const p = iso(x, 0.02, z);
+  ctx.globalCompositeOperation = 'lighter';
+  const g = ctx.createRadialGradient(p[0], p[1], 2, p[0], p[1], 70);
+  g.addColorStop(0, 'rgba(255,190,110,.35)'); g.addColorStop(1, 'rgba(255,190,110,0)');
+  ctx.fillStyle = g; ctx.fillRect(p[0] - 70, p[1] - 70, 140, 140);
+  ctx.globalCompositeOperation = 'source-over';
+  line([p[0], p[1] - 14], [p[0], p[1] - 6], EARTH.root, 1.2);
+  ctx.fillStyle = '#3a2a1c'; ctx.fillRect(p[0] - 4, p[1] - 6, 8, 2);
+  ctx.fillStyle = '#ffd38a'; ctx.fillRect(p[0] - 3, p[1] - 4, 6, 7);
+}
+// a room's way in from the lawn: a grass hole, a shaft down through the wall, and an arched tunnel mouth at the floor
+function drawWallHole(d) {
+  const h = holeOf(d);
+  if (!h) return;
+  if (h.side === 'floor') return drawHatch(d, h);
+  const on = (along, z) => (h.side === 'back' ? iso(h.at + along, 0.012, z) : iso(0.012, h.at + along, z)), top = shaftTop(d);
+  poly([on(-0.26, 30), on(0.26, 30), on(0.3, top), on(-0.3, top)], 'rgba(20,13,10,.55)');
+  const [gx, gy] = byHole(h, 0, -GRASS_HOLE_OFF), g = iso(gx, gy, grassAt(d, gx, gy));
+  ell(g[0], g[1], 24, 11, P.dirt); ell(g[0], g[1] + 1, 15, 6.5, P.hole);
+  const r = 0.42, spring = 20, pts = [on(-r, 0)];
+  for (let k = 0; k <= 8; k++) { const a = Math.PI - k * Math.PI / 8; pts.push(on(r * Math.cos(a), spring + 14 * Math.sin(a))); }
+  pts.push(on(r, 0));
+  ctx.lineJoin = 'round'; ctx.strokeStyle = P.dirt; ctx.lineWidth = 6;
+  ctx.beginPath(); pts.forEach((p, i) => i ? ctx.lineTo(...p) : ctx.moveTo(...p)); ctx.closePath(); ctx.stroke();
+  poly(pts, P.hole);
+  const [mx, my] = byHole(h, 0, 0.35), m = iso(mx, my); ell(m[0], m[1], 22, 7, 'rgba(86,57,42,.75)');
 }
 
-/* ---------- drawing: building shell ---------- */
-function windowOnBack(x0, x1, t) {
-  const h = new Date().getHours(), night = h < 6 || h >= 20, dusk = (h >= 17 && h < 20) || (h >= 6 && h < 8);
-  const z0 = 34, z1 = 82, pts = [iso(x0, 0, z0), iso(x1, 0, z0), iso(x1, 0, z1), iso(x0, 0, z1)];
-  poly(pts, night ? '#1b2a4d' : dusk ? '#e39a6c' : '#8cc6e6');
-  if (night) stars.forEach(([u, sz, ph]) => { const p = iso(x0 + 0.1 + u * (x1 - x0 - 0.2), 0, sz); ctx.fillStyle = `rgba(255,248,220,${0.45 + 0.45 * Math.sin(t * 1.5 + ph)})`; ctx.fillRect(p[0], p[1], 1.6, 1.6); });
-  const m = iso(x1 - 0.45, 0, 72); ell(m[0], m[1], 5.5, 5.5, night ? '#f2ead0' : '#ffd77e');
-  ctx.strokeStyle = P.base; ctx.lineWidth = 3; ctx.beginPath(); pts.forEach((p, i) => i ? ctx.lineTo(...p) : ctx.moveTo(...p)); ctx.closePath(); ctx.stroke();
-  const mid = (x0 + x1) / 2; line(iso(mid, 0, z0), iso(mid, 0, z1), P.base, 2); line(iso(x0, 0, 58), iso(x1, 0, 58), P.base, 2);
-  box(x0 - 0.1, 0, x1 - x0 + 0.2, 0.16, 3, 31, B(P.shelf));
-}
-function windowOnLeft(y0, y1, t) {
-  const h = new Date().getHours(), night = h < 6 || h >= 20;
-  const z0 = 34, z1 = 82, pts = [iso(0, y0, z0), iso(0, y1, z0), iso(0, y1, z1), iso(0, y0, z1)];
-  poly(pts, night ? '#1b2a4d' : '#8cc6e6');
-  if (night) stars.forEach(([u, sz, ph]) => { const p = iso(0, y0 + 0.1 + u * (y1 - y0 - 0.2), sz); ctx.fillStyle = `rgba(255,248,220,${0.45 + 0.45 * Math.sin(t * 1.5 + ph)})`; ctx.fillRect(p[0], p[1], 1.6, 1.6); });
-  ctx.strokeStyle = P.base; ctx.lineWidth = 3; ctx.beginPath(); pts.forEach((p, i) => i ? ctx.lineTo(...p) : ctx.moveTo(...p)); ctx.closePath(); ctx.stroke();
-  const mid = (y0 + y1) / 2; line(iso(0, mid, z0), iso(0, mid, z1), P.base, 2); line(iso(0, y0, 58), iso(0, y1, 58), P.base, 2);
-}
-function drawShell(t) {
-  OFF = [0, 0];
-  // slab edge so the floor reads as one building
-  poly([iso(0, BH), iso(BW, BH), iso(BW, BH, -12), iso(0, BH, -12)], '#241a14');
-  poly([iso(BW, 0), iso(BW, BH), iso(BW, BH, -12), iso(BW, 0, -12)], '#1c1410');
-  for (let i = 0; i < BW; i++) for (let j = 0; j < BH; j++)
-    poly([iso(i, j), iso(i + 1, j), iso(i + 1, j + 1), iso(i, j + 1)], (i + j) % 2 ? P.hallA : P.hallB);
-  poly([iso(0, 0), iso(BW, 0), iso(BW, 0, WH), iso(0, 0, WH)], P.wallR);
-  poly([iso(0, 0), iso(0, BH), iso(0, BH, WH), iso(0, 0, WH)], P.wallL);
-  for (let x = 1; x < BW; x++) line(iso(x, 0), iso(x, 0, WH), 'rgba(0,0,0,.13)');
-  for (let y = 1; y < BH; y++) line(iso(0, y), iso(0, y, WH), 'rgba(0,0,0,.13)');
-  poly([iso(0, 0), iso(BW, 0), iso(BW, 0, 6), iso(0, 0, 6)], P.base);
-  poly([iso(0, 0), iso(0, BH), iso(0, BH, 6), iso(0, 0, 6)], P.base);
-  ctx.lineJoin = 'round'; ctx.strokeStyle = P.base; ctx.lineWidth = 4; ctx.beginPath();
-  ctx.moveTo(...iso(0, BH, WH)); ctx.lineTo(...iso(0, 0, WH)); ctx.lineTo(...iso(BW, 0, WH)); ctx.stroke();
-  windowOnBack(8.4, 10.2, t); windowOnBack(21.4, 23.2, t); windowOnBack(11.3, 12.7, t);
-  windowOnLeft(11.8, 13.6, t); windowOnLeft(9.2, 10.8, t);
-  // corridor runner
-  poly([iso(11.2, 0.4), iso(12.8, 0.4), iso(12.8, 19.6), iso(11.2, 19.6)], '#3a332d');
-  poly([iso(0.4, 9.2), iso(23.6, 9.2), iso(23.6, 10.8), iso(0.4, 10.8)], '#3a332d');
+// an inner room's way in: a hatch in its floor, and a grass hole on the lawn behind the grid at the other end of a tunnel
+function drawHatch(d, h) {
+  const [gx, gy] = h.lawn, g = iso(gx, gy, grassAt(d, gx, gy));
+  ell(g[0], g[1], 24, 11, P.dirt); ell(g[0], g[1] + 1, 15, 6.5, P.hole);
+  const m = iso(...h.door);
+  ell(m[0], m[1], 24, 10, P.dirt); ell(m[0], m[1] + 1, 17, 7, P.hole);
 }
 
 /* ---------- drawing: one department room (local coords, OFF = room origin) ---------- */
-function partitions(o, color) {
-  const c = B(color || P.part);
-  if (o.oy > 0) { box(0, -0.14, 4.5, 0.14, PART, 0, c); box(6.5, -0.14, 4.5, 0.14, PART, 0, c); }
-  if (o.ox > 0) { box(-0.14, 0, 0.14, 7.4, PART, 0, c); box(-0.14, 8.8, 0.14, 0.2, PART, 0, c); }
-}
 function drawRoom(d, t) {
-  for (let i = 0; i < COLS; i++) for (let j = 0; j < ROWS; j++)
-    poly([iso(i, j), iso(i + 1, j), iso(i + 1, j + 1), iso(i, j + 1)], (i + j) % 2 ? P.floorA : P.floorB);
-  partitions(d);
+  drawPitShell(d, P.floorA, P.floorB);
   d.branches.forEach(b => {
     const { x, y } = areaOf(b), [rA, rB] = b.col;
     poly([iso(x, y), iso(x + BAW, y), iso(x + BAW, y + BAH), iso(x, y + BAH)], rA);
     poly([iso(x + 0.12, y + 0.12), iso(x + BAW - 0.12, y + 0.12), iso(x + BAW - 0.12, y + BAH - 0.12), iso(x + 0.12, y + BAH - 0.12)], rB);
     poly([iso(x + 0.24, y + 0.24), iso(x + BAW - 0.24, y + 0.24), iso(x + BAW - 0.24, y + BAH - 0.24), iso(x + 0.24, y + BAH - 0.24)], rA);
   });
-  const bc = iso(9.9, 6.9); ell(bc[0], bc[1], 40, 20, P.dirt); ell(bc[0], bc[1] + 1, 26, 12, P.hole);
-  [0, 1, 2, 3].forEach(k => { const b = ST.bed(k), c = iso(b.x, b.y); ell(c[0], c[1] + 2, 30, 15, P.cush); ell(c[0], c[1], 22, 10, P.cushIn); });
+  drawWallHole(d);
+  [0, 1, 2].forEach(k => { const b = ST.bed(k), c = iso(b.x, b.y); ell(c[0], c[1] + 2, 30, 15, P.cush); ell(c[0], c[1], 22, 10, P.cushIn); });
   d.foxes.filter(f => f.state === 'waiting').forEach(f => {
-    const [sx, sy] = iso(f.x, f.y), g = ctx.createLinearGradient(0, sy, 0, sy - 260), a = 0.22 + 0.08 * Math.sin(t * 4);
+    const [sx, sy] = iso(f.x, f.y), bh = Math.min(260, grassAt(d, f.x, f.y) + 40), g = ctx.createLinearGradient(0, sy, 0, sy - bh), a = 0.22 + 0.08 * Math.sin(t * 4);
     g.addColorStop(0, `rgba(255,200,87,${a})`); g.addColorStop(1, 'rgba(255,200,87,0)');
-    ctx.fillStyle = g; ctx.fillRect(sx - 16, sy - 260, 32, 260);
+    ctx.fillStyle = g; ctx.fillRect(sx - 16, sy - bh, 32, bh); // it rises only a little above the grass, never into the den behind
     ell(sx, sy, 22, 9, `rgba(255,200,87,${a})`);
   });
 }
+const BOARD_X = 4.75;
 function drawBoard(d) {
-  box(2.0, 0.15, 1.6, 0.2, 52, 0, B('#5e4330'));
-  poly([iso(2.08, 0.36, 10), iso(3.52, 0.36, 10), iso(3.52, 0.36, 50), iso(2.08, 0.36, 50)], P.cork);
+  const H = fit(d, BOARD_X + 0.8, 0, 52), k = H / 52;
+  if (H < 30) return; // the wall is too low to hang it
+  box(BOARD_X, 0.15, 1.6, 0.2, H, 0, B('#5e4330'));
+  poly([iso(BOARD_X + 0.08, 0.36, 10 * k), iso(BOARD_X + 1.52, 0.36, 10 * k), iso(BOARD_X + 1.52, 0.36, H - 2), iso(BOARD_X + 0.08, 0.36, H - 2)], P.cork);
   d.foxes.filter(f => !f.isCub && f.quest && f.state !== 'sleeping').slice(0, 4).forEach((f, i) => {
-    const x = 2.18 + (i % 2) * 0.68, z = i < 2 ? 46 : 28;
-    poly([iso(x, 0.37, z), iso(x + 0.56, 0.37, z), iso(x + 0.56, 0.37, z - 15), iso(x, 0.37, z - 15)], '#f1e4c6');
-    for (let l = 0; l < 3; l++) line(iso(x + 0.08, 0.375, z - 5 - l * 3.4), iso(x + 0.16 + 0.28 * ((l + i) % 3 / 2 + 0.3), 0.375, z - 5 - l * 3.4), 'rgba(80,60,40,.5)', 1);
-    const pin = iso(x + 0.28, 0.375, z - 1); ell(pin[0], pin[1], 2.2, 2.2, f.fur);
+    const x = BOARD_X + 0.18 + (i % 2) * 0.68, z = (i < 2 ? 46 : 28) * k, nh = 15 * k;
+    poly([iso(x, 0.37, z), iso(x + 0.56, 0.37, z), iso(x + 0.56, 0.37, z - nh), iso(x, 0.37, z - nh)], '#f1e4c6');
+    for (let l = 0; l < 3; l++) line(iso(x + 0.08, 0.375, z - (5 + l * 3.4) * k), iso(x + 0.16 + 0.28 * ((l + i) % 3 / 2 + 0.3), 0.375, z - (5 + l * 3.4) * k), 'rgba(80,60,40,.5)', 1);
+    const pin = iso(x + 0.28, 0.375, z - k); ell(pin[0], pin[1], 2.2, 2.2, f.fur);
   });
 }
 function drawDesk(owner, t) {
   const { x: dx, y: dy } = deskRect(owner), k = owner.bDesk;
-  const on = owner.state === 'working' && owner.act === 'type' && !owner.travel;
+  const on = owner.state === 'working' && (owner.act === 'type' || owner.act === 'think') && !owner.travel;
   box(dx, dy, DW, DD, 22, 0, B(P.desk));
   poly([iso(dx + 0.1, dy + DD + 0.01, 8), iso(dx + 0.45, dy + DD + 0.01, 8), iso(dx + 0.45, dy + DD + 0.01, 15), iso(dx + 0.1, dy + DD + 0.01, 15)], owner.fur);
   box(dx + 0.42, dy + 0.1, 0.16, 0.12, 4, 22, B(P.mon));
@@ -670,79 +1055,72 @@ function drawDesk(owner, t) {
   }
   const mug = iso(dx + 0.88, dy + 0.45, 22); ctx.fillStyle = owner.fur; ctx.fillRect(mug[0] - 2.5, mug[1] - 6, 5, 6);
 }
-function drawShelf() {
-  box(0, 3, 0.55, 2, 72, 0, B(P.shelf));
-  poly([iso(0.55, 3.06, 3), iso(0.55, 4.94, 3), iso(0.55, 4.94, 70), iso(0.55, 3.06, 70)], '#45301f');
-  books.forEach(b => poly([iso(0.56, b.y, b.z), iso(0.56, b.y + b.w, b.z), iso(0.56, b.y + b.w, b.z + b.h), iso(0.56, b.y, b.z + b.h)], b.c));
-  [4, 21, 38, 55].forEach(z => line(iso(0.56, 3.06, z), iso(0.56, 4.94, z), tone(P.shelf, 1.1), 2));
+function drawShelf(d) {
+  const H = fit(d, 0.3, 4.5, 72);
+  if (H < 24) return;
+  box(0, 3.75, 0.55, 1.5, H, 0, B(P.shelf));
+  poly([iso(0.55, 3.81, 3), iso(0.55, 5.19, 3), iso(0.55, 5.19, H - 2), iso(0.55, 3.81, H - 2)], '#45301f');
+  books.filter(b => b.z + b.h < H - 2).forEach(b => poly([iso(0.56, b.y, b.z), iso(0.56, b.y + b.w, b.z), iso(0.56, b.y + b.w, b.z + b.h), iso(0.56, b.y, b.z + b.h)], b.c));
+  [4, 21, 38, 55].filter(z => z < H - 4).forEach(z => line(iso(0.56, 3.81, z), iso(0.56, 5.19, z), tone(P.shelf, 1.1), 2));
 }
 function drawRack(d, t) {
-  box(0, 5.9, 0.7, 1.1, 80, 0, B(P.rack));
+  const H = fit(d, 0.3, 6.3, 80);
+  if (H < 24) return;
+  box(0, 5.75, 0.7, 1.1, H, 0, B(P.rack));
   const busy = d.foxes.some(f => f.state === 'working' && f.act === 'bash');
   for (let u = 0; u < 6; u++) {
     const z = 8 + u * 12;
-    poly([iso(0.71, 5.97, z), iso(0.71, 6.93, z), iso(0.71, 6.93, z + 9), iso(0.71, 5.97, z + 9)], '#363f46');
+    if (z + 9 > H - 2) break;
+    poly([iso(0.71, 5.82, z), iso(0.71, 6.78, z), iso(0.71, 6.78, z + 9), iso(0.71, 5.82, z + 9)], '#363f46');
     for (let j = 0; j < 4; j++) {
-      const lit = Math.sin(t * (busy ? 16 : 2.5) + u * 1.7 + j * 2.3 + d.idx) > 0.1, y = 6.05 + j * 0.12;
+      const lit = Math.sin(t * (busy ? 16 : 2.5) + u * 1.7 + j * 2.3 + d.idx) > 0.1, y = 5.9 + j * 0.12;
       poly([iso(0.72, y, z + 3), iso(0.72, y + 0.06, z + 3), iso(0.72, y + 0.06, z + 6), iso(0.72, y, z + 6)], lit ? (j === 3 ? '#ffb347' : '#6ff0a0') : '#22302a');
     }
   }
 }
-function drawTelescope() {
-  const top = iso(9.4, 1.05, 28);
-  [iso(9.1, 0.8), iso(9.75, 0.95), iso(9.4, 1.35)].forEach(l => line(top, l, '#5b4330', 2.2));
-  ctx.lineCap = 'round'; line(iso(9.2, 1.15, 25), iso(9.65, 0.6, 46), P.brass, 6); line(iso(9.6, 0.66, 44), iso(9.68, 0.56, 47), '#7a5a2a', 7); ctx.lineCap = 'butt';
+// the WebSearch station: a brass periscope poking up toward the lawn
+function drawTelescope(d) {
+  const H = Math.min(84, wallTop(d, 5.6, 0));
+  if (H < 40) return;
+  const top = iso(5.6, 1.6, 28);
+  [iso(5.3, 1.35), iso(5.95, 1.5), iso(5.6, 1.9)].forEach(l => line(top, l, '#5b4330', 2.2));
+  ctx.lineCap = 'round'; line(iso(5.6, 1.6, 26), iso(5.6, 1.6, H), P.brass, 6); line(iso(5.6, 1.6, H), iso(5.85, 1.6, H + 6), '#7a5a2a', 7); ctx.lineCap = 'butt';
 }
-function drawPlant(x = 10.3, y = 0.25) {
+function drawPlant(x = 11.5, y = 5.0) {
   box(x, y, 0.5, 0.5, 14, 0, B(P.pot));
   const c = iso(x + 0.25, y + 0.25, 14);
   [[-8, -8, 9], [7, -10, 8], [0, -18, 10], [-4, -26, 7], [6, -24, 6]].forEach(([dx, dy, r], i) => ell(c[0] + dx, c[1] + dy, r, r * 0.8, i % 2 ? P.leaf : tone(P.leaf, 0.8)));
 }
 
-/* ---------- the Commons: trophy cabinet, a status board for every department, couches ---------- */
-function drawLobby(t) {
-  OFF = [LOBBY.ox, LOBBY.oy];
-  for (let i = 0; i < COLS; i++) for (let j = 0; j < ROWS; j++)
-    poly([iso(i, j), iso(i + 1, j), iso(i + 1, j + 1), iso(i, j + 1)], (i + j) % 2 ? P.lobby : P.lobbyB);
-  partitions(LOBBY);
-  poly([iso(3.5, 3.6), iso(8.5, 3.6), iso(8.5, 7.2), iso(3.5, 7.2)], '#2f4f55');
-  poly([iso(3.7, 3.8), iso(8.3, 3.8), iso(8.3, 7.0), iso(3.7, 7.0)], '#3c6168');
-  const items = [];
-  items.push({ d: 1.2, fn: () => {
-    box(0.4, 0.3, 2.8, 0.6, 58, 0, B('#5e4330'));
-    poly([iso(0.5, 0.91, 6), iso(3.1, 0.91, 6), iso(3.1, 0.91, 54), iso(0.5, 0.91, 54)], 'rgba(160,210,220,.18)');
-    for (let i = 0; i < trophies; i++) {
-      const p = iso(0.8 + (i % 3) * 0.85, 0.9, i < 3 ? 40 : 18);
-      ctx.fillStyle = P.gold; ctx.fillRect(p[0] - 4, p[1] - 2, 8, 2); ctx.fillRect(p[0] - 1, p[1] - 6, 2, 4);
-      ctx.beginPath(); ctx.moveTo(p[0] - 5, p[1] - 12); ctx.lineTo(p[0] + 5, p[1] - 12); ctx.quadraticCurveTo(p[0] + 4, p[1] - 5, p[0], p[1] - 6); ctx.quadraticCurveTo(p[0] - 4, p[1] - 5, p[0] - 5, p[1] - 12); ctx.fill();
-    }
-  } });
-  items.push({ d: 6.5, fn: () => {
-    // status board: one row per department, a light per fox
-    box(5.6, 0.2, 3.6, 0.18, 46, 12, B('#20272b'));
-    box(7.3, 0.25, 0.2, 0.1, 12, 0, B('#20272b'));
-    const fy = 0.385;
-    poly([iso(5.7, fy, 16), iso(9.1, fy, 16), iso(9.1, fy, 54), iso(5.7, fy, 54)], '#0f1c22');
-    DENS.forEach((d, r) => {
-      const z = 49 - r * 12, need = d.foxes.some(f => f.state === 'waiting');
-      poly([iso(5.8, fy + 0.002, z), iso(6.0, fy + 0.002, z), iso(6.0, fy + 0.002, z - 8), iso(5.8, fy + 0.002, z - 8)], d.rug[1]);
-      d.foxes.filter(f => !f.isCub).forEach((f, i) => {
-        const x = 6.15 + i * 0.3, c = f.state === 'waiting' ? (Math.sin(t * 6) > 0 ? COL.alert : '#7a5a1a') : f.state === 'sleeping' ? '#3b4a44' : COL.ok;
-        poly([iso(x, fy + 0.002, z - 1), iso(x + 0.2, fy + 0.002, z - 1), iso(x + 0.2, fy + 0.002, z - 7), iso(x, fy + 0.002, z - 7)], c);
-      });
-      if (need) line(iso(5.75, fy + 0.003, z + 1), iso(9.05, fy + 0.003, z + 1), COL.alert, 1);
-    });
-  } });
-  items.push({ d: 9.2, fn: () => { box(4.2, 4.0, 2.6, 0.9, 10, 0, B(P.couch)); box(4.2, 4.0, 2.6, 0.25, 22, 0, B(P.couch)); } });
-  items.push({ d: 12.0, fn: () => { box(5.0, 5.6, 1.6, 0.8, 9, 0, B('#7b5337')); const c = iso(5.6, 6.0, 9); ctx.fillStyle = '#e8e0d0'; ctx.fillRect(c[0] - 3, c[1] - 5, 6, 5); } });
-  items.push({ d: 10.6, fn: () => { box(7.6, 4.3, 0.9, 2.2, 10, 0, B(P.couch)); box(8.25, 4.3, 0.25, 2.2, 22, 0, B(P.couch)); } });
-  items.push({ d: 1.0, fn: () => drawPlant(0.2, 8.2) }, { d: 10.6, fn: () => drawPlant(10.2, 0.3) }, { d: 18.4, fn: () => drawPlant(10.2, 8.2) });
-  items.push({ d: 3.0, fn: () => { box(0.3, 4.2, 0.8, 2.0, 30, 0, B('#5e4330')); const c = iso(0.9, 5.0, 30); ctx.fillStyle = '#2b2b2b'; ctx.fillRect(c[0] - 6, c[1] - 12, 12, 12); ctx.fillStyle = '#e8e0d0'; ctx.fillRect(c[0] + 8, c[1] - 6, 4, 5); } });
-  items.sort((a, b) => a.d - b.d).forEach(i => i.fn());
+const HOP_HEIGHT = 26;
+// 0→1 through a tap's jump-and-spin, or null when the fox isn't hopping
+function hopOf(f) {
+  if (f.hopAt == null) return null;
+  const k = (performance.now() / 1000 - f.hopAt) / HOP_T;
+  if (k >= 1) { f.hopAt = null; return null; }
+  return k;
 }
-
 function drawFox(f, t) {
-  const [sx, sy] = iso(f.x, f.y), ph = t + f.phase, p = PX * (f.isCub ? 0.85 : 1);
+  const [sx, sy] = iso(f.x, f.y, f.z || 0), hop = hopOf(f);
+  if (hop == null && f.state !== 'diving') return drawFoxBody(f, t);
+  ctx.save();
+  if (f.state === 'diving') {
+    // sink below the rim of the grass hole: clip at the hole and slide the fox down through it
+    ctx.beginPath(); ctx.rect(sx - 60, sy - 120, 120, 121); ctx.clip();
+    ctx.translate(0, Math.min(1, f.dive / DIVE_T) * 44);
+  }
+  if (hop != null) {
+    const lift = Math.sin(hop * Math.PI) * (reduceMotion ? 6 : HOP_HEIGHT);
+    ctx.translate(sx, sy - lift);
+    if (!reduceMotion) ctx.scale(Math.cos(hop * TAU), 1); // one full turn, seen side-on
+    ctx.translate(-sx, -sy);
+    drawFoxBody(f, t);
+    f.headTop -= lift;
+  } else drawFoxBody(f, t);
+  ctx.restore();
+}
+function drawFoxBody(f, t) {
+  const [sx, sy] = iso(f.x, f.y, f.z || 0), ph = t + f.phase, p = PX * (f.isCub ? 0.85 : 1);
   const pal = { o: f.fur, d: f.shade, c: f.cream, k: INK };
   ell(sx, sy, (f.isCub ? 9 : 15), (f.isCub ? 3.5 : 5.5), 'rgba(0,0,0,.28)');
   if (f === selected) { ctx.strokeStyle = COL.fox; ctx.lineWidth = 2; ctx.beginPath(); ctx.ellipse(sx, sy, 21, 8.5, 0, 0, TAU); ctx.stroke(); }
@@ -761,11 +1139,12 @@ function drawFox(f, t) {
   let rows = SPR.front, flip = false, lift = 0, shake = 0;
   if (f.travel) { rows = step ? SPR.sideB : SPR.sideA; flip = f.dir < 0; }
   else if (f.state === 'working') {
-    if (f.act === 'task') { rows = SPR.sideA; flip = f.dir < 0; } else rows = SPR.back;
-    if (!reduceMotion && (f.act === 'type' || f.act === 'bash')) lift = (Math.floor(ph * 8) % 2) * p * 0.5;
+    if (f.act === 'task' || f.act === 'pong') { rows = SPR.sideA; flip = f.dir < 0; } else rows = SPR.back;
+    if (!reduceMotion && (f.act === 'type' || f.act === 'bash' || f.act === 'game' || f.act === 'pong')) lift = (Math.floor(ph * 8) % 2) * p * 0.5;
   }
   else if (f.state === 'celebrating') { rows = SPR.happy; lift = reduceMotion ? 0 : Math.abs(Math.sin(ph * 7)) * 14; }
   else if (f.state === 'stumble') shake = reduceMotion ? 0 : Math.sin(ph * 45) * 2.5;
+  else if (f.state === 'climbing') { rows = SPR.back; shake = reduceMotion ? 0 : Math.sin(ph * 10) * 1.5; }
   const top = sy - rows.length * p - lift;
   pix(rows, sx - 8 * p + shake, top, pal, flip, p);
   let head = top;
@@ -779,43 +1158,60 @@ function drawFox(f, t) {
 }
 
 function statusOf(f) {
+  if (f.away) return ['in the Commons', 'sleep'];
+  if (f.state === 'climbing') return ['climbing', 'idle'];
+  if (f.lounger && !f.entering) {
+    if (f.travel) return ['strolling', 'idle'];
+    if (f.cur?.k === 'hang') return [f.cur.h.label, f.state === 'sleeping' ? 'sleep' : 'idle'];
+  }
   if (f.state === 'sleeping') return ['asleep', 'sleep'];
   if (f.state === 'waiting') return ['needs you', 'wait'];
   if (f.state === 'celebrating') return ['quest done', 'done'];
   if (f.state === 'stumble') return ['tool error', 'err'];
+  if (f.state === 'diving' || f.entering) return ['moving in', 'idle'];
+  if (f.state === 'working' && f.act === 'think') return [`thinking${since(f.thinkSince)}`, 'busy'];
+  if (f.live && f.turnOpen && (f.cur?.k === 'pace' || (f.cur?.k === 'desk' && f.travel))) return [`thinking${since(f.thinkSince)}`, 'busy'];
   const c = f.cur;
-  if (c && c.k === 'tool') return [`${c.tool} ${short(c.target)}`, 'busy'];
+  if (c && c.k === 'tool') return [`${c.tool} ${short(c.target)}${since(c.startedAt)}`, 'busy'];
   if (c && c.k === 'prompt') return ['new quest', 'busy'];
   if (c && c.k === 'home') return ['heading home', 'idle'];
   if (f.travel) return ['walking', 'idle'];
   return ['idle', 'idle'];
 }
+// " · 12s" once something has run for a few seconds, so long steps visibly keep going
+const since = t0 => { if (t0 == null) return ''; const s = Math.floor(simT - t0); return s < 3 ? '' : s < 60 ? ` · ${s}s` : ` · ${Math.floor(s / 60)}m${String(s % 60).padStart(2, '0')}`; };
 const PILL = { busy: COL.ok, wait: COL.alert, done: COL.fox, err: COL.err, sleep: COL.muted, idle: COL.muted };
 const placed = [];
+const LABEL_PAD = 6, LABEL_DOT = 8, STATUS_MAX = 22;
+// two stacked lines in one pill: the name (with its status dot) over the status
+const LABEL_TRIES = 40; // stacking labels clear of each other gives up after this many passes, so a crowd can't stall a frame
 function drawLabel(f) {
-  const [sx, sy] = iso(f.x, f.y), [txt, kind] = statusOf(f);
+  if (f.state === 'diving') return;
+  const [sx, sy] = iso(f.x, f.y, f.z || 0), [txt, kind] = statusOf(f), cub = f.isCub;
   let y = (f.headTop ?? sy - 40) - 4;
-  ctx.font = `600 ${f.isCub ? 10 : 12}px ${FONT}`;
-  const name = f.isCub ? 'cub' : f.name, nw = ctx.measureText(name).width;
-  ctx.font = `400 ${f.isCub ? 9 : 10}px ${MONO}`;
-  const label = txt.length > 24 ? txt.slice(0, 23) + '…' : txt, tw = ctx.measureText(label).width;
-  const w = nw + tw + 30, h = f.isCub ? 18 : 22, x = sx - w / 2;
-  for (let moved = true; moved;) { moved = false; for (const q of placed) if (x < q.x + q.w && q.x < x + w && y - h < q.y + 2 && q.y - q.h < y + 2) { y = q.y - q.h - 3; moved = true; } }
+  const nameFont = `600 ${cub ? 9 : 10}px ${FONT}`, statusFont = `400 8.5px ${MONO}`, name = cub ? 'cub' : f.name;
+  ctx.font = nameFont; const nw = ctx.measureText(name).width;
+  const label = txt.length > STATUS_MAX ? txt.slice(0, STATUS_MAX - 1) + '…' : txt;
+  ctx.font = statusFont; const tw = ctx.measureText(label).width;
+  const w = Math.max(nw, tw) + LABEL_DOT + LABEL_PAD * 2, h = cub ? 20 : 24, x = sx - w / 2;
+  for (let moved = true, tries = 0; moved && tries++ < LABEL_TRIES;) { moved = false; for (const q of placed) if (x < q.x + q.w && q.x < x + w && y - h < q.y + 2 && q.y - q.h < y + 2) { y = q.y - q.h - 3; moved = true; } }
   placed.push({ x, y, w, h });
-  ctx.fillStyle = 'rgba(14,21,19,.86)'; rrect(x, y - h, w, h, h / 2); ctx.fill();
+  ctx.fillStyle = 'rgba(14,21,19,.86)'; rrect(x, y - h, w, h, 8); ctx.fill();
   ctx.strokeStyle = kind === 'wait' ? COL.alert : 'rgba(255,255,255,.08)'; ctx.lineWidth = 1; ctx.stroke();
-  ell(x + 10, y - h / 2, 3.5, 3.5, PILL[kind]);
-  ctx.fillStyle = COL.fg; ctx.textBaseline = 'middle';
-  ctx.font = `600 ${f.isCub ? 10 : 12}px ${FONT}`; ctx.fillText(name, x + 18, y - h / 2 + 0.5);
-  ctx.fillStyle = PILL[kind];
-  ctx.font = `400 ${f.isCub ? 9 : 10}px ${MONO}`; ctx.fillText(label, x + 24 + nw, y - h / 2 + 0.5);
+  const nameY = y - h + h * 0.36, textX = x + LABEL_PAD + LABEL_DOT;
+  ell(x + LABEL_PAD + 2.5, nameY, 2.5, 2.5, PILL[kind]);
+  ctx.textBaseline = 'middle';
+  ctx.fillStyle = COL.fg; ctx.font = nameFont; ctx.fillText(name, textX, nameY + 0.5);
+  ctx.fillStyle = PILL[kind]; ctx.font = statusFont; ctx.fillText(label, textX, y - h + h * 0.73 + 0.5);
 }
 function drawParts(d) {
   for (const p of d.parts) {
     const a = Math.max(0, p.life / p.max);
     if (p.kind === 'confetti') { ctx.save(); ctx.translate(p.x, p.y); ctx.rotate(p.rot); ctx.globalAlpha = a; ctx.fillStyle = p.color; ctx.fillRect(-2.5, -1.5, 5, 3); ctx.restore(); }
     else if (p.kind === 'smoke') { ctx.globalAlpha = a * 0.6; ell(p.x, p.y, p.r * (2 - a), p.r * (2 - a), '#bfb8ad'); }
+    else if (p.kind === 'dust') { ctx.globalAlpha = a * 0.55; const r = p.r * (1.9 - 0.9 * a); ell(p.x, p.y, r, r * 0.8, '#7d6247'); ell(p.x - r * 0.3, p.y - r * 0.2, r * 0.7, r * 0.55, '#a38763'); }
     else if (p.kind === 'xp') { ctx.globalAlpha = Math.min(1, a * 1.6); ctx.fillStyle = COL.alert; ctx.font = `800 15px ${FONT}`; ctx.textAlign = 'center'; ctx.fillText(p.text, p.x, p.y); ctx.textAlign = 'left'; }
+    else if (p.kind === 'glyph') { ctx.globalAlpha = Math.min(1, a * 1.8); ctx.fillStyle = p.color; ctx.font = `600 ${p.size}px ${MONO}`; ctx.textAlign = 'center'; ctx.fillText(p.text, p.x, p.y); ctx.textAlign = 'left'; }
     else if (p.kind === 'z') { ctx.globalAlpha = a * 0.85; ctx.fillStyle = '#cfe3ff'; ctx.font = `600 ${11 + (1 - a) * 6}px ${FONT}`; ctx.fillText('z', p.x, p.y); }
     ctx.globalAlpha = 1;
   }
@@ -824,28 +1220,60 @@ function drawParts(d) {
 /* ---------- camera: one continuous floor you can pan and zoom ---------- */
 const cv = document.getElementById('floor');
 ctx = cv.getContext('2d');
-const BOUNDS = { x0: -BH * TW / 2 - 30, x1: BW * TW / 2 + 30, y0: -WH - 70, y1: (BW + BH) * TH / 2 + 30 };
 const cam = { x: 0, y: 0, z: 0.5 }, camT = { x: 0, y: 0, z: 0.5 };
-let scr = { w: 1, h: 1, dpr: 1 }, fitZ = 0.5, roomZ = 1;
-function roomCenter(o) { return isoAbs(o.ox + 5.5, o.oy + 4.5, 30); }
+let scr = { w: 1, h: 1, dpr: 1 }, roomZ = 1;
+const ZOOM_STEP = 1.35;
+// the "[ ]" button keeps every den centred as rooms open and close, until you pan, zoom or visit a room
+let followFloor = true;
+function roomCenter(o) { return isoAbs(o.ox + o.w / 2, o.oy + o.h / 2, 30 + o.z0); }
 function resize() {
   const r = cv.getBoundingClientRect(), dpr = Math.min(2, devicePixelRatio || 1);
   if (!r.width) return;
   scr = { w: r.width, h: r.height, dpr };
   cv.width = Math.round(r.width * dpr); cv.height = Math.round(r.height * dpr);
-  fitZ = Math.min(r.width / (BOUNDS.x1 - BOUNDS.x0), (r.height - 70) / (BOUNDS.y1 - BOUNDS.y0));
   roomZ = Math.min(r.width / 760, (r.height - 70) / 520);
 }
 new ResizeObserver(() => { const first = scr.w === 1; resize(); if (first) { overview(true); } }).observe(cv);
-const clampZ = z => Math.max(fitZ * 0.75, Math.min(roomZ * 2.4, z));
+// the fit button's zoom: every den fits, then one step closer, so the dens fill the screen
+const FIT_MARGIN = { x: 60, y: 100 };
+const roomsFitZ = () => { const b = roomsBox(); return Math.min(scr.w / (b.x1 - b.x0 + FIT_MARGIN.x), (scr.h - 70) / (b.y1 - b.y0 + FIT_MARGIN.y)); };
+const overviewZ = () => roomsFitZ() * ZOOM_STEP;
+// one zoom step out from the fit button's view, to see every den whole and some lawn around them
+const minZ = () => overviewZ() / ZOOM_STEP;
+const clampZ = z => { const hi = roomZ * 2.4; return Math.max(Math.min(minZ(), hi), Math.min(hi, z)); };
+const PAN_MARGIN = 90, PAN_STIFF = 140; // screen px of the floor that must stay in view; how hard the edge resists a drag
+// the Commons and the open rooms in world px: footprints at floor level up to the wall tops, no lawn around them
+function roomsBox() {
+  const pts = [COMMONS, ...openDens()].flatMap(({ ox, oy, w, h, z0 }) => [z0 - LIP, Math.min(z0, groundZ(ox + w, oy + h)) - LIP, groundZ(ox, oy)]
+    .flatMap(z => [[ox, oy], [ox + w, oy], [ox, oy + h], [ox + w, oy + h]].map(([x, y]) => isoAbs(x, y, z))));
+  const xs = pts.map(p => p[0]), ys = pts.map(p => p[1]);
+  return { x0: Math.min(...xs), x1: Math.max(...xs), y0: Math.min(...ys), y1: Math.max(...ys) };
+}
+// where the camera centre may go at zoom z: until only PAN_MARGIN px of the rooms remain on the far side
+function panLimits(z) {
+  const b = roomsBox(), hw = scr.w / 2 / z, m = PAN_MARGIN / z, top = (scr.h / 2 + 20) / z, bottom = (scr.h / 2 - 20) / z;
+  return { x0: b.x0 - hw + m, x1: b.x1 + hw - m, y0: b.y0 - bottom + m, y1: b.y1 + top - m };
+}
+const clampTo = (v, lo, hi) => lo > hi ? (lo + hi) / 2 : Math.min(hi, Math.max(lo, v));
+function clampPan(c) { const L = panLimits(c.z); c.x = clampTo(c.x, L.x0, L.x1); c.y = clampTo(c.y, L.y0, L.y1); }
+// past a limit by d, show d*R/(d+R): the edge stretches with growing resistance
+function rubber(v, lo, hi, z) {
+  const R = PAN_STIFF / z, c = clampTo(v, lo, hi), d = Math.abs(v - c);
+  return c + Math.sign(v - c) * d * R / (d + R);
+}
 function flyTo(x, y, z, instant) {
   camT.x = x; camT.y = y; camT.z = clampZ(z);
   if (instant || reduceMotion) Object.assign(cam, camT);
 }
-function overview(instant) { flyTo((BOUNDS.x0 + BOUNDS.x1) / 2, (BOUNDS.y0 + BOUNDS.y1) / 2 + 10, fitZ, instant); }
-function visit(o, instant) { const [x, y] = roomCenter(o); flyTo(x, y, roomZ, instant); }
-function visitBranch(d, b) { const a = areaOf(b); flyTo(...isoAbs(d.ox + a.x + BAW / 2, d.oy + a.y + BAH / 2, 20), roomZ * 1.7); }
+function aimAtFloor(instant) {
+  const b = roomsBox(), z = overviewZ();
+  flyTo((b.x0 + b.x1) / 2, (b.y0 + b.y1) / 2 + 20 / z, z, instant); // the canvas centre sits 20px low, so aim a little past the middle
+}
+function overview(instant) { followFloor = true; aimAtFloor(instant); }
+function visit(o, instant) { followFloor = false; const [x, y] = roomCenter(o); flyTo(x, y, roomZ, instant); }
+function visitBranch(d, b) { followFloor = false; const a = areaOf(b); flyTo(...isoAbs(d.ox + a.x + BAW / 2, d.oy + a.y + BAH / 2, 20 + d.z0), roomZ * 1.7); }
 function updateView() {
+  if (followFloor) aimAtFloor(false); else { camT.z = clampZ(camT.z); if (!drag?.raw) clampPan(camT); }
   const k = reduceMotion ? 1 : 0.14;
   cam.x += (camT.x - cam.x) * k; cam.y += (camT.y - cam.y) * k; cam.z += (camT.z - cam.z) * k;
   view = { s: cam.z, ox: scr.w / 2 - cam.x * cam.z, oy: scr.h / 2 + 20 - cam.y * cam.z, dpr: scr.dpr };
@@ -856,7 +1284,7 @@ function focusRoom() {
   // the department the camera is centred on, once zoomed in enough to be "in" it
   if (cam.z < roomZ * 0.6) return null;
   let best = null, bd = Infinity;
-  [...DENS, LOBBY].forEach(o => { const [x, y] = roomCenter(o), dd = Math.hypot(x - cam.x, y - cam.y); if (dd < bd) { bd = dd; best = o; } });
+  [COMMONS, ...openDens()].forEach(o => { const [x, y] = roomCenter(o), dd = Math.hypot(x - cam.x, y - cam.y); if (dd < bd) { bd = dd; best = o; } });
   return bd < 360 ? best : null;
 }
 
@@ -866,21 +1294,22 @@ function drawSigns() {
   signs = [];
   ctx.setTransform(scr.dpr, 0, 0, scr.dpr, 0, 0);
   ctx.textBaseline = 'middle';
-  const depts = [...DENS, LOBBY].map(o => {
-    const isDen = !!o.foxes;
-    const [x, y] = toScreen(...isoAbs(o.ox + 5.5, o.oy + 0.2, isDen ? 128 : 90));
-    const need = isDen ? o.foxes.filter(f => f.state === 'waiting').length : 0;
-    const awake = isDen ? o.foxes.filter(f => !f.isCub && f.state !== 'sleeping').length : 0;
-    const state = !isDen ? 'shared space' : need ? `${need} needs you` : awake ? `${awake} awake` : 'all asleep';
+  const shown = [COMMONS, ...openDens().filter(d => d.grow > 0.6)];
+  const depts = shown.map(o => {
+    const [x, y] = toScreen(...isoAbs(o.ox + o.w / 2, o.oy + 0.2, o.oy === 0 ? groundZ(o.ox + o.w / 2, o.oy) + 26 : o.z0 + 70));
+    const need = o.foxes.filter(f => f.state === 'waiting').length;
+    const awake = o.foxes.filter(f => !f.isCub && f.state !== 'sleeping').length;
+    const here = o.foxes.length;
+    const state = o.isCommons ? (here ? `${here} hanging out` : 'nobody here') : need ? `${need} needs you` : awake ? `${awake} awake` : 'all asleep';
     ctx.font = `600 13px ${MONO}`; const nw = ctx.measureText(o.name).width;
     ctx.font = `600 11px ${FONT}`; const sw = ctx.measureText(state).width;
     const w = nw + sw + 44, h = 28;
-    return { o, isDen, need, awake, state, nw, x: x - w / 2, y: y - h / 2, w, h };
+    return { o, need, awake, state, nw, x: x - w / 2, y: y - h / 2, w, h };
   });
   const taken = depts.map(r => ({ ...r }));
   const hit = (a, b) => a.x < b.x + b.w + 4 && b.x < a.x + a.w + 4 && a.y < b.y + b.h + 3 && b.y < a.y + a.h + 3;
-  DENS.forEach(d => d.branches.forEach(b => {
-    const a = areaOf(b), [x, y] = toScreen(...isoAbs(d.ox + a.x + BAW / 2, d.oy + a.y + BAH + 0.1, 0));
+  shown.forEach(d => d.branches.forEach(b => {
+    const a = areaOf(b), [x, y] = toScreen(...isoAbs(d.ox + a.x + BAW / 2, d.oy + a.y + BAH + 0.1, d.z0));
     const wait = b.foxes.some(f => f.state === 'waiting'), text = '⎇ ' + b.name;
     ctx.font = `600 10.5px ${MONO}`;
     const r = { w: ctx.measureText(text).width + 16, h: 19 }; r.x = x - r.w / 2; r.y = y - r.h / 2 + 4;
@@ -891,46 +1320,91 @@ function drawSigns() {
     ctx.fillStyle = wait ? COL.alert : COL.fg; ctx.fillText(text, r.x + 8, r.y + r.h / 2 + 0.5);
     signs.push({ d, b, ...r });
   }));
-  depts.forEach(({ o, isDen, need, awake, state, nw, x: bx, y: by, w, h }) => {
+  depts.forEach(({ o, need, awake, state, nw, x: bx, y: by, w, h }) => {
     ctx.fillStyle = need ? 'rgba(48,38,12,.94)' : 'rgba(14,21,19,.9)'; rrect(bx, by, w, h, 8); ctx.fill();
     ctx.strokeStyle = need ? COL.alert : 'rgba(255,255,255,.12)'; ctx.lineWidth = 1; ctx.stroke();
-    ctx.fillStyle = isDen ? o.rug[1] : '#3c6168'; rrect(bx + 10, by + 9, 10, 10, 3); ctx.fill();
+    ctx.fillStyle = o.rug[1]; rrect(bx + 10, by + 9, 10, 10, 3); ctx.fill();
     ctx.fillStyle = COL.fg; ctx.font = `600 13px ${MONO}`; ctx.fillText(o.name, bx + 28, by + h / 2 + 0.5);
     ctx.fillStyle = need ? COL.alert : awake ? COL.ok : COL.muted; ctx.font = `600 11px ${FONT}`; ctx.fillText(state, bx + 36 + nw, by + h / 2 + 0.5);
     signs.push({ o, x: bx, y: by, w, h });
   });
 }
 function render(t) {
+  solidCache = null;
   updateView();
   ctx.setTransform(1, 0, 0, 1, 0, 0);
   ctx.clearRect(0, 0, cv.width, cv.height);
   ctx.setTransform(scr.dpr * view.s, 0, 0, scr.dpr * view.s, scr.dpr * view.ox, scr.dpr * view.oy);
   ctx.lineCap = 'butt';
-  drawShell(t);
-  // rooms back to front: billing (left), acme/web (top), foxhole (right), then the Commons (front)
-  const rooms = [...DENS.map(d => ({ o: d, k: d.ox + d.oy, fn: () => drawDen(d, t) })), { o: LOBBY, k: LOBBY.ox + LOBBY.oy, fn: () => drawLobby(t) }];
-  rooms.sort((a, b) => a.k - b.k).forEach(r => r.fn());
+  drawGrounds(t);
+  const rooms = backToFront([COMMONS, ...openDens()]);
+  rooms.forEach(d => drawDen(d, t));
+  rooms.filter(d => d.t >= 1 && (d.isCommons || d.open)).forEach(d => { OFF = [d.ox, d.oy]; OFFZ = d.z0; drawGlassWalls(d); });
+  OFFZ = 0;
+  drawOutdoors(t);
   OFF = [0, 0];
   ctx.globalCompositeOperation = 'lighter';
-  const c = isoAbs(12, 10, 40), g = ctx.createRadialGradient(c[0], c[1], 10, c[0], c[1], 700);
+  const c = isoAbs(COMMONS.ox + COMMONS.w / 2, COMMONS.oy + COMMONS.h / 2, 40), g = ctx.createRadialGradient(c[0], c[1], 10, c[0], c[1], 450);
   g.addColorStop(0, 'rgba(255,170,80,.08)'); g.addColorStop(1, 'rgba(255,170,80,0)');
-  ctx.fillStyle = g; ctx.fillRect(c[0] - 700, c[1] - 700, 1400, 1400);
+  ctx.fillStyle = g; ctx.fillRect(c[0] - 450, c[1] - 450, 900, 900);
   ctx.globalCompositeOperation = 'source-over';
   if (view.s > roomZ * 0.55) {
     placed.length = 0;
-    DENS.forEach(d => { OFF = [d.ox, d.oy]; [...d.foxes].sort((a, b) => (b.x + b.y) - (a.x + a.y)).forEach(drawLabel); });
+    rooms.filter(d => d.t >= 1).forEach(d => { OFF = [d.ox, d.oy]; OFFZ = d.z0; d.foxes.filter(f => !f.away).sort((a, b) => (b.x + b.y) - (a.x + a.y)).forEach(drawLabel); });
+    OFFZ = 0;
   }
   OFF = [0, 0];
-  DENS.forEach(drawParts);
+  [COMMONS, ...DENS].forEach(drawParts);
+  drawDropRings();
   drawSigns();
 }
 function drawDen(d, t) {
-  OFF = [d.ox, d.oy];
+  OFF = [d.ox, d.oy]; OFFZ = d.z0;
+  if (d.isCommons || (d.t >= 1 && d.open)) drawDenContents(d, t);
+  else digRoom(d, t);
+  OFFZ = 0;
+}
+/* A room is dug down from the lawn: a pit mouth opens in the grass, then the hole deepens and uncovers the room, the
+   floor last. Closing fills the ground back in. The room is drawn where it finally stands and seen through the pit. */
+const DIG_MOUTH_T = 0.2;           // share of the animation spent widening the pit mouth
+const LAND_T = 1;                  // the room has landed (dust goes up) when its animation reaches this
+const easeOutCubic = t => 1 - (1 - t) ** 3;
+function convexHull(pts) {
+  const p = [...pts].sort((a, b) => a[0] - b[0] || a[1] - b[1]), cross = (o, a, b) => (a[0] - o[0]) * (b[1] - o[1]) - (a[1] - o[1]) * (b[0] - o[0]);
+  const half = list => { const h = []; for (const q of list) { while (h.length > 1 && cross(h[h.length - 2], h[h.length - 1], q) <= 0) h.pop(); h.push(q); } h.pop(); return h; };
+  return half(p).concat(half([...p].reverse()));
+}
+function digRoom(d, t) {
+  const { edge } = pitOf(d.w, d.h), ground = ([x, y]) => isoAbs(d.ox + x, d.oy + y, groundZ(d.ox + x, d.oy + y));
+  const rim = edge.map(ground), cx = rim.reduce((a, p) => a + p[0], 0) / rim.length, cy = rim.reduce((a, p) => a + p[1], 0) / rim.length;
+  const mouth = Math.min(1, d.t / DIG_MOUTH_T), reach = (Math.max(0, groundZ(d.ox, d.oy) - d.z0) + LIP + 6) * easeOutCubic(d.t);
+  if (d.t <= 0) return;
+  const top = rim.map(p => [cx + (p[0] - cx) * mouth, cy + (p[1] - cy) * mouth]), pit = convexHull([...top, ...top.map(p => [p[0], p[1] + reach])]);
+  ctx.save();
+  ctx.beginPath(); pit.forEach((p, i) => i ? ctx.lineTo(p[0], p[1]) : ctx.moveTo(p[0], p[1])); ctx.closePath();
+  ctx.fillStyle = P.hole; ctx.fill(); ctx.clip();
+  drawDenContents(d, t);
+  ctx.restore();
+  ctx.lineJoin = 'round'; ctx.strokeStyle = P.dirt; ctx.lineWidth = 5;
+  ctx.beginPath(); top.forEach((p, i) => i ? ctx.lineTo(p[0], p[1]) : ctx.moveTo(p[0], p[1])); ctx.closePath(); ctx.stroke();
+}
+// the dirt a landing room throws up: a ring of dust clouds around its mouth and a few clods
+const CLOD_COLS = ['#56392a', '#6b4a30', '#8a6446'];
+function landDust(d) {
+  const { edge } = pitOf(d.w, d.h);
+  for (let i = 0; i < 40; i++) {
+    const [x, y] = edge[Math.floor(R() * edge.length)], [sx, sy] = isoAbs(d.ox + x, d.oy + y, groundZ(d.ox + x, d.oy + y)), out = [x - d.w / 2, y - d.h / 2];
+    d.parts.push({ kind: 'dust', x: sx + rnd(-8, 8), y: sy + rnd(-4, 4), vx: (out[0] - out[1]) * 2.2 + rnd(-10, 10), vy: (out[0] + out[1]) * 0.8 + rnd(-24, -8), life: rnd(1.2, 2.2), max: 2.2, r: rnd(8, 15) });
+    if (i % 3 === 0) d.parts.push({ kind: 'confetti', x: sx, y: sy - 4, vx: rnd(-60, 60), vy: rnd(-170, -80), life: rnd(0.7, 1.2), max: 1.2, color: CLOD_COLS[i % 3], rot: R() * TAU });
+  }
+}
+function drawDenContents(d, t) {
+  if (d.isCommons) return drawCommons(d, t);
   drawRoom(d, t);
   const items = [];
   d.foxes.filter(f => !f.isCub).forEach(f => { const r = deskRect(f); items.push({ d: r.x + DW / 2 + r.y + DD / 2, fn: () => drawDesk(f, t) }); });
-  items.push({ d: 2.5, fn: () => drawBoard(d) }, { d: 4.3, fn: drawShelf }, { d: 6.6, fn: () => drawRack(d, t) }, { d: 10.0, fn: drawTelescope }, { d: 11.0, fn: () => drawPlant() });
-  d.foxes.forEach(f => items.push({ d: f.x + f.y, fn: () => drawFox(f, t) }));
+  items.push({ d: 5.0, fn: () => drawBoard(d) }, { d: 4.5, fn: () => drawShelf(d) }, { d: 6.3, fn: () => drawRack(d, t) }, { d: 7.2, fn: () => d.oy === 0 && drawTelescope(d) }, { d: 16.5, fn: () => drawPlant() });
+  d.foxes.filter(f => !f.away && !f.onGrass).forEach(f => items.push({ d: f.x + f.y, fn: () => drawFox(f, t) }));
   items.sort((a, b) => a.d - b.d).forEach(i => i.fn());
 }
 
@@ -946,18 +1420,24 @@ cv.addEventListener('pointermove', e => {
     const now = pinchState(); zoomAt(drag.pinch.mid[0], drag.pinch.mid[1], drag.pinch.z * now.d / drag.pinch.d, true); drag.moved += 10; return;
   }
   drag.moved += Math.abs(dx) + Math.abs(dy);
-  if (drag.moved > 4) { cv.classList.add('dragging'); camT.x -= dx / cam.z; camT.y -= dy / cam.z; cam.x = camT.x; cam.y = camT.y; }
+  if (drag.moved > 4) {
+    followFloor = false; cv.classList.add('dragging');
+    drag.raw ??= { x: camT.x, y: camT.y }; // the finger's own target; the camera shows it stretched past the limits
+    drag.raw.x -= dx / cam.z; drag.raw.y -= dy / cam.z;
+    const L = panLimits(cam.z);
+    camT.x = cam.x = rubber(drag.raw.x, L.x0, L.x1, cam.z); camT.y = cam.y = rubber(drag.raw.y, L.y0, L.y1, cam.z);
+  }
 });
 function endPointer(e) {
   if (!pts.has(e.pointerId)) return;
   pts.delete(e.pointerId);
   if (drag && drag.moved <= 4 && pts.size === 0) tap(e.offsetX, e.offsetY);
-  if (pts.size === 0) { drag = null; cv.classList.remove('dragging'); }
+  if (pts.size === 0) { if (drag?.raw) clampPan(camT); drag = null; cv.classList.remove('dragging'); } // let go: the easing springs it back
 }
 cv.addEventListener('pointerup', endPointer); cv.addEventListener('pointercancel', endPointer);
 function zoomAt(px, py, z, instant) {
   const [wx, wy] = toWorld(px, py), nz = clampZ(z);
-  camT.z = nz; camT.x = wx - (px - scr.w / 2) / nz; camT.y = wy - (py - scr.h / 2 - 20) / nz;
+  followFloor = false; camT.z = nz; camT.x = wx - (px - scr.w / 2) / nz; camT.y = wy - (py - scr.h / 2 - 20) / nz; clampPan(camT);
   if (instant) Object.assign(cam, camT);
 }
 cv.addEventListener('wheel', e => { e.preventDefault(); zoomAt(e.offsetX, e.offsetY, camT.z * Math.exp(-e.deltaY * 0.0015), true); }, { passive: false });
@@ -966,24 +1446,28 @@ cv.addEventListener('keydown', e => {
   if (k === 'ArrowLeft') camT.x -= step; else if (k === 'ArrowRight') camT.x += step;
   else if (k === 'ArrowUp') camT.y -= step; else if (k === 'ArrowDown') camT.y += step;
   else if (k === '+' || k === '=') camT.z = clampZ(camT.z * 1.25); else if (k === '-') camT.z = clampZ(camT.z / 1.25);
+  else if (k === '0') { overview(); e.preventDefault(); return; }
   else return;
-  e.preventDefault();
+  followFloor = false; e.preventDefault();
 });
 function tap(px, py) {
   const sign = [...signs].reverse().find(s => px >= s.x && px <= s.x + s.w && py >= s.y && py <= s.y + s.h);
-  if (sign) { if (sign.b) visitBranch(sign.d, sign.b); else visit(sign.o); return; }
+  if (sign) { if (sign.b) visitBranch(sign.d, sign.b); else { visit(sign.o); openDenPanel(sign.o); } return; }
   const [wx, wy] = toWorld(px, py);
   let best = null, bd = 30;
-  DENS.forEach(d => d.foxes.forEach(f => { const [sx, sy] = wpos(f), dd = Math.hypot(wx - sx, wy - (sy - 16)); if (dd < bd) { bd = dd; best = f; } }));
-  if (best) { select(best.parent || best); if (cam.z < roomZ * 0.6) visit(best.den); return; }
+  [COMMONS, ...openDens()].forEach(d => d.foxes.filter(f => !f.away).forEach(f => { const [sx, sy] = wpos(f), dd = Math.hypot(wx - sx, wy - (sy - 16)); if (dd < bd) { bd = dd; best = f; } }));
+  if (best) {
+    best.hopAt = performance.now() / 1000;
+    select(best.of || best.parent || best); if (cam.z < roomZ * 0.6) visit(best.den); return;
+  }
   if (cam.z < roomZ * 0.6) {
     // click anywhere on a department's floor to go there
-    const room = [...DENS, LOBBY].find(o => { const lx = (wx / (TW / 2) + wy / (TH / 2)) / 2 - o.ox, ly = (wy / (TH / 2) - wx / (TW / 2)) / 2 - o.oy; return lx >= 0 && lx <= COLS && ly >= 0 && ly <= ROWS; });
-    if (room) visit(room);
+    const room = [COMMONS, ...openDens()].find(o => { const v = (wy + o.z0) / (TH / 2), u = wx / (TW / 2), lx = (u + v) / 2 - o.ox, ly = (v - u) / 2 - o.oy; return lx >= 0 && lx <= o.w && ly >= 0 && ly <= o.h; });
+    if (room) { visit(room); openDenPanel(room); }
   }
 }
-document.getElementById('zoom-in').addEventListener('click', () => { camT.z = clampZ(camT.z * 1.35); });
-document.getElementById('zoom-out').addEventListener('click', () => { camT.z = clampZ(camT.z / 1.35); });
+document.getElementById('zoom-in').addEventListener('click', () => { followFloor = false; camT.z = clampZ(camT.z * ZOOM_STEP); });
+document.getElementById('zoom-out').addEventListener('click', () => { followFloor = false; camT.z = clampZ(camT.z / ZOOM_STEP); });
 document.getElementById('overview').addEventListener('click', () => overview());
 
 /* ---------- UI ---------- */
@@ -993,8 +1477,10 @@ const fmtTarget = t => t == null ? '' : hideTargets ? hash(t) : t;
 const short = t => { if (t == null) return ''; if (hideTargets) return hash(t); const b = t.includes('/') && !t.includes(' ') ? t.split('/').pop() : t; return b.length > 18 ? b.slice(0, 17) + '…' : b; };
 const hhmmss = s => s.slice(11, 19);
 const fmtK = n => n >= 1000 ? (n / 1000).toFixed(1) + 'k' : String(n);
-const cost = f => { const [i, o] = RATES[f.model]; return (f.tIn * i + f.tOut * o) / 1e6; };
-const typeClass = ev => ev.type === 'permission.request' ? 'ty-perm' : ev.type === 'session.stop' ? 'ty-stop' : ev.status === 'error' ? 'ty-err' : ev.type.startsWith('session') ? 'ty-sess' : '';
+// real model ids carry versions (claude-opus-5-5), so match on the family prefix; unknown models cost nothing
+const rateOf = m => RATES[m] || RATES[Object.keys(RATES).find(k => m && m.startsWith(k))] || [0, 0];
+const cost = f => { const [i, o] = rateOf(f.model); return (f.tIn * i + f.tOut * o) / 1e6; };
+const typeClass = ev => ev.type === 'permission.request' ? 'ty-perm' : ev.type === 'turn.end' ? 'ty-stop' : ev.status === 'error' ? 'ty-err' : ev.type.startsWith('session') ? 'ty-sess' : '';
 const awakeOf = d => d.foxes.filter(f => !f.isCub && f.state !== 'sleeping');
 // the department in view comes first, so Approve answers the fox in front of you
 const waitingAll = () => { const fr = focusRoom(); return DENS.flatMap(d => d.foxes.filter(f => f.state === 'waiting')).sort((a, b) => (b.den === fr) - (a.den === fr)); };
@@ -1009,7 +1495,7 @@ function logEvent(f, ev) {
   li.querySelector('.who span').textContent = f.isCub ? `↳ ${f.name} cub` : f.name;
   li.children[3].className = typeClass(ev);
   li.children[3].textContent = ev.type + (ev.status === 'error' ? ' ✕' : '');
-  li.children[4].textContent = ev.tool ? `${ev.tool} ${fmtTarget(ev.target)}` : ev.type === 'session.stop' ? `${fmtK(ev.usage.inputTokens + ev.usage.outputTokens)} tokens` : '';
+  li.children[4].textContent = ev.tool ? `${ev.tool} ${fmtTarget(ev.target)}` : ev.type === 'turn.end' && ev.usage ? `${fmtK(ev.usage.inputTokens + ev.usage.outputTokens)} tokens` : '';
   li.addEventListener('click', () => { const o = f.parent || f; select(o); visit(o.den); showJson(ev); });
   logEl.prepend(li);
   while (logEl.children.length > 160) logEl.lastChild.remove();
@@ -1041,7 +1527,7 @@ function buildDepts() {
     wrap.innerHTML = '<button type="button" class="dept-top"><span class="dept-name"><span class="swatch"></span><span></span></span><span class="dept-state"></span></button><div class="branches"></div>';
     wrap.querySelector('.swatch').style.background = d.rug[1];
     wrap.querySelector('.dept-name span:last-child').textContent = d.name;
-    wrap.querySelector('.dept-top').addEventListener('click', () => visit(d));
+    wrap.querySelector('.dept-top').addEventListener('click', () => { visit(d); openDenPanel(d); });
     const bl = wrap.querySelector('.branches');
     d.branches.forEach(b => {
       const row = document.createElement('button'); row.type = 'button'; row.className = 'branch';
@@ -1057,6 +1543,7 @@ function buildDepts() {
 buildDepts();
 let lastTimelineKey = '';
 function select(f) {
+  if (denPanel) closeDenPanel();
   selected = f;
   $('d-dot').style.background = f.fur; $('d-name').textContent = f.name; $('d-src').textContent = `${f.source} · ${f.model} · ${f.den.name} · ⎇ ${f.branch}`;
   const last = f.events[f.events.length - 1];
@@ -1091,6 +1578,7 @@ function renderDetail() {
 function renderDepts() {
   const fr = focusRoom();
   deptEls.forEach((el, d) => {
+    el.hidden = !d.open;
     const wait = d.foxes.filter(f => f.state === 'waiting').length, awake = awakeOf(d).length, all = d.foxes.filter(f => !f.isCub);
     el.classList.toggle('need', wait > 0);
     el.setAttribute('aria-current', String(fr === d));
@@ -1106,10 +1594,14 @@ function renderDepts() {
     });
   });
   const where = $('where');
-  if (fr) {
-    const isDen = !!fr.foxes;
-    where.textContent = isDen ? `You're in ${fr.name} · ${fr.branches.length} branch${fr.branches.length > 1 ? 'es' : ''} · ${awakeOf(fr).length} awake` : 'You’re in the Commons · status board and trophies';
-  } else where.textContent = `Whole floor · ${DENS.length} departments · ${DENS.reduce((a, d) => a + awakeOf(d).length, 0)} foxes awake`;
+  if (fr && fr.isCommons) {
+    where.textContent = `You're in the Commons · ${fr.foxes.length} hanging out`;
+  } else if (fr) {
+    where.textContent = `You're in ${fr.name} · ${fr.branches.length} branch${fr.branches.length > 1 ? 'es' : ''} · ${awakeOf(fr).length} awake`;
+  } else {
+    const open = DENS.filter(d => d.open);
+    where.textContent = `All dens · ${open.length} active department${open.length === 1 ? '' : 's'} · ${open.reduce((a, d) => a + awakeOf(d).length, 0)} foxes awake`;
+  }
 }
 function renderAlert() {
   const waiting = waitingAll(), el = $('alert');
@@ -1117,14 +1609,16 @@ function renderAlert() {
   const f = waiting[0], s = f.cur, left = Math.max(0, Math.ceil(25 - (simT - f.waitSince)));
   el.className = 'alert on'; $('alert-icon').textContent = '!';
   $('alert-title').textContent = `${f.name} in ${f.den.name} · ${f.branch} needs you` + (waiting.length > 1 ? ` (+${waiting.length - 1} more)` : '');
-  $('alert-sub').textContent = `${s.tool} wants to run: ${fmtTarget(s.target)} · demo auto-approves in ${left}s`;
+  $('alert-sub').textContent = LIVE ? `Answer the prompt in your terminal · waiting ${Math.floor(simT - f.waitSince)}s`
+    : `${s.tool} wants to run: ${fmtTarget(s.target)} · demo auto-approves in ${left}s`;
   $('go-den').hidden = focusRoom() === f.den;
 }
 function renderUi() {
+  $('overview').setAttribute('aria-pressed', String(followFloor));
   $('lvl').textContent = 'Lv ' + level;
   $('xpbar').style.width = (xp / xpNeed(level) * 100).toFixed(1) + '%';
   $('xptext').textContent = `${xp} / ${xpNeed(level)} XP`;
-  renderAlert(); renderDepts(); renderDetail();
+  renderAlert(); renderDepts(); renderDetail(); renderHq();
 }
 $('approve').addEventListener('click', () => { const f = waitingAll()[0]; if (f) decide(f, true); });
 $('deny').addEventListener('click', () => { const f = waitingAll()[0]; if (f) decide(f, false); });
@@ -1135,15 +1629,1009 @@ $('go-den').addEventListener('click', () => { const f = waitingAll()[0]; if (f) 
 }));
 $('hide-targets').addEventListener('change', e => { hideTargets = e.target.checked; if (jsonEv) showJson(jsonEv); lastTimelineKey = ''; renderUi(); });
 
+/* ---------- the Commons: cut into the hill at level -1, where the first den hangs off its bottom corner ----------
+   A few resident foxes always live here. A fox whose session goes quiet climbs up its room's hole, crosses the
+   lawn and drops into the Commons' hole to join them, and does the same in reverse when the session wakes:
+   pong, the bar, arcade and console games, the couch, a nap or a dance. */
+const COMMONS = Object.assign(makeDen('Commons', 0), { id: 'commons', isCommons: true, open: true, t: 1, grow: 1,
+  w: CELL_W, h: CELL_H, ox: 0, oy: 0, z0: ringZ(0), rug: ['#2f4f55', '#3c6168'] });
+COMMONS.blocked = new Set(['2,0', '3,0', '4,0', '0,1', '0,2', '0,3', '0,4', '3,2', '4,2', '5,2', '3,3', '4,3', '5,3',
+  '1,4', '2,4', '3,4', '1,5', '2,5', '3,5', '7,3']);
+const STOOL_Z = 10, COUCH_Z = 8, TABLE_Z = 14;
+const PONG_Y = 2.9, PONG_X0 = 2.8, PONG_X1 = 6.4;
+const HANGOUTS = [
+  { x: 2.6, y: 1.45, z: STOOL_Z, face: 1, state: 'working', act: 'drink', label: 'at the bar' },
+  { x: 3.5, y: 1.45, z: STOOL_Z, face: -1, state: 'working', act: 'drink', label: 'at the bar' },
+  { x: 4.4, y: 1.45, z: STOOL_Z, face: -1, state: 'working', act: 'drink', label: 'at the bar' },
+  { x: 1.5, y: 1.7, face: -1, state: 'working', act: 'game', label: 'playing arcade' },
+  { x: 1.5, y: 2.7, face: -1, state: 'working', act: 'game', label: 'playing arcade' },
+  { x: 1.5, y: 3.9, face: -1, state: 'working', act: 'game', label: 'playing video games' },
+  { x: PONG_X0, y: PONG_Y, face: 1, state: 'working', act: 'pong', label: 'playing pong', pong: 0 },
+  { x: PONG_X1, y: PONG_Y, face: -1, state: 'working', act: 'pong', label: 'playing pong', pong: 1 },
+  { x: 2.4, y: 4.95, z: COUCH_Z, face: 1, state: 'idle', label: 'on the couch' },
+  { x: 3.3, y: 4.95, z: COUCH_Z, face: -1, state: 'idle', label: 'on the couch' },
+  { x: 7.0, y: 1.9, face: 1, state: 'sleeping', label: 'napping' },
+  { x: 5.0, y: 4.6, face: 1, state: 'celebrating', label: 'dancing' },
+  { x: 5.8, y: 4.9, face: -1, state: 'celebrating', label: 'dancing' },
+];
+const RESIDENTS = [{ name: 'Bramble', fur: '#d9822f' }, { name: 'Thistle', fur: '#c96a33' }, { name: 'Nettle', fur: '#e39a52' }, { name: 'Wren', fur: '#dfe7ec', arctic: true }];
+const MAX_LOUNGERS = HANGOUTS.length - RESIDENTS.length;
+const pongSpot = side => HANGOUTS.find(h => h.pong === side);
+
+function makeLounger(o) {
+  return makeFox({ source: 'resident', model: 'off duty', branch: 'commons', lounger: true, ...o }, COMMONS);
+}
+function freeHangouts(f) {
+  const taken = new Set(COMMONS.foxes.filter(o => o !== f && o.spot).map(o => o.spot));
+  return { taken, free: HANGOUTS.filter(h => !taken.has(h) && h !== f.spot) };
+}
+// settle a fox straight into a free hangout, as if it had been there all along
+function placeAtHangout(f, h = freeHangouts(f).free[0]) {
+  if (!h) return;
+  Object.assign(f, { x: h.x, y: h.y, z: h.z || 0, dir: h.face, spot: h, cur: { k: 'hang', h }, state: h.state, act: h.act || null, timer: rnd(6, 16) });
+}
+// residents start mid-game: a pong match, the bar and the arcade
+RESIDENTS.forEach((r, i) => {
+  const f = makeLounger({ ...r, resident: true });
+  COMMONS.foxes.push(f);
+  placeAtHangout(f, HANGOUTS[[6, 7, 0, 3][i]]);
+});
+
+function loungerTick(f, dt) {
+  if (f.leaving) return;
+  if (f.timer > 0) { f.timer -= dt; return; }
+  pickHangout(f);
+}
+function pickHangout(f) {
+  const { taken, free } = freeHangouts(f);
+  // a fox waiting at the pong table usually gets a partner
+  const partner = free.find(h => h.pong != null && taken.has(pongSpot(1 - h.pong)));
+  const h = partner && R() < 0.6 ? partner : free[Math.floor(R() * free.length)];
+  f.z = 0;
+  if (!h) { f.spot = null; f.cur = { k: 'wander' }; goTo(f, { x: rnd(4.2, 6.6), y: rnd(4.2, 5.0), st: 'rug' }); return; }
+  f.spot = h; f.cur = { k: 'hang', h };
+  goTo(f, { x: h.x, y: h.y, face: h.face, st: 'hang' });
+}
+// a fox is down here while its session is quiet (or its room is waiting for a free slot)
+const wantsCommons = f => !f.isCub && !f.entering && (f.away || (!roomShown(f.den) && (!f.den.open || f.den.slot == null)));
+// whether a lawn point is inside a room's rounded outline, grown by `grow` tiles
+const inRoom = (d, x, y, grow = 0) => {
+  return x > d.ox - grow && x < d.ox + d.w + grow && y > d.oy - grow && y < d.oy + d.h + grow;
+};
+// A walk across the lawn between two world points that never crosses a room, so a fox never floats over one.
+// Dens touch only at corners, which walls the lawn into pockets; the only way between them is the gap where two
+// rounded corners meet, so this searches a fine grid against the rounded outlines and then pulls the path taut.
+function lawnRoute(ax, ay, bx, by) {
+  // the rooms tile one rectangle, so the lawn route only has to keep out of that
+  const [fc, fr] = footprintOf(DENS.filter(d => d.slot != null).map(d => d.slot)), rooms = [{ ox: 0, oy: 0, w: fc * CELL_W, h: fr * CELL_H }], GROW = 0.1, CELL = 0.5, PAD = 6;
+  const blocked = (x, y) => inRiver(x, y, 0.3) || inRoom(rooms[0], x, y, GROW);
+  const clear = (p, q) => { const n = Math.ceil(Math.hypot(q[0] - p[0], q[1] - p[1]) / 0.2); for (let t = 0; t <= n; t++) if (blocked(p[0] + (q[0] - p[0]) * t / n, p[1] + (q[1] - p[1]) * t / n)) return false; return true; };
+  const x0 = Math.floor(Math.min(...rooms.map(d => d.ox), ax, bx) - PAD), y0 = Math.floor(Math.min(...rooms.map(d => d.oy), ay, by) - PAD);
+  const w = Math.ceil((Math.max(...rooms.map(d => d.ox + d.w), ax, bx) + PAD - x0) / CELL), h = Math.ceil((Math.max(...rooms.map(d => d.oy + d.h), ay, by) + PAD - y0) / CELL);
+  const at = (i, j) => [x0 + (i + 0.5) * CELL, y0 + (j + 0.5) * CELL], key = (i, j) => j * w + i;
+  const cellOf = (x, y) => [Math.floor((x - x0) / CELL), Math.floor((y - y0) / CELL)], start = cellOf(ax, ay), goal = cellOf(bx, by);
+  const prev = new Map([[key(...start), null]]), queue = [start];
+  for (let head = 0; head < queue.length && !prev.has(key(...goal)); head++) {
+    const [i, j] = queue[head];
+    for (const [di, dj] of [[1, 0], [-1, 0], [0, 1], [0, -1], [1, 1], [1, -1], [-1, 1], [-1, -1]]) {
+      const ni = i + di, nj = j + dj;
+      if (ni < 0 || nj < 0 || ni >= w || nj >= h || prev.has(key(ni, nj))) continue;
+      const q = at(ni, nj);
+      if (!(ni === goal[0] && nj === goal[1]) && blocked(...q)) continue;
+      if (di && dj && !clear(at(i, j), q)) continue; // a diagonal step must not clip a corner
+      prev.set(key(ni, nj), [i, j]); queue.push([ni, nj]);
+    }
+  }
+  if (!prev.has(key(...goal))) return [[bx, by]];
+  const pts = [];
+  for (let c = goal; c; c = prev.get(key(...c))) pts.unshift(at(...c));
+  pts[0] = [ax, ay]; pts[pts.length - 1] = [bx, by];
+  // pull taut: from each point, jump to the furthest later point it can see
+  const route = []; let from = 0;
+  while (from < pts.length - 1) {
+    let to = from + 1;
+    for (let m = pts.length - 1; m > from + 1; m--) if (clear(pts[from], pts[m])) { to = m; break; }
+    route.push(pts[to]); from = to;
+  }
+  return route;
+}
+// a fox that just climbed out of its own room's hole shows up at that hole's grass hole and walks the lawn to the Commons'
+function walkToCommons(l, den) {
+  const [hx, hy] = byHole(holeOf(den), 0, -GRASS_HOLE_OFF), [gx, gy] = byHole(COMMONS_HOLE, 0, -GRASS_HOLE_OFF);
+  const x = den.ox + hx, y = den.oy + hy;
+  Object.assign(l, { x, y, z: grassAt(COMMONS, x, y), onGrass: true, path: lawnRoute(x, y, gx, gy), travel: true, state: 'walking', cur: { k: 'dive' }, entering: true, afterEntry: pickHangout });
+  burst(l, 'smoke', 6);
+}
+function syncLoungers() {
+  const wanted = DENS.flatMap(d => d.foxes.filter(wantsCommons)).sort((a, b) => (b.lastAt || 0) - (a.lastAt || 0)).slice(0, MAX_LOUNGERS);
+  const want = new Set(wanted);
+  // foxes heading back to their rooms climb out of the Commons' hole (or just pop off if their room has no place yet)
+  for (const l of COMMONS.foxes.filter(o => o.of && !o.leaving && !want.has(o.of))) {
+    if (selected === l) select(l.of);
+    if (l.of.den.slot == null) { burst(l, 'smoke', 8); COMMONS.foxes = COMMONS.foxes.filter(o => o !== l); continue; }
+    const [dx, dy] = doorOf(COMMONS);
+    Object.assign(l, { leaving: true, spot: null, z: 0, cur: { k: 'leave' } });
+    goTo(l, { x: dx, y: dy, st: 'door' });
+  }
+  const here = new Set(COMMONS.foxes.filter(o => !o.leaving).map(o => o.of));
+  for (const f of wanted) {
+    if (here.has(f)) continue;
+    const l = makeLounger({ name: f.name, fur: f.fur, arctic: f.arctic, model: f.model, of: f });
+    COMMONS.foxes.push(l);
+    // one that just climbed out of its own room's hole walks the lawn to the Commons' hole and drops in; any other just joins
+    if (f.viaHole) { f.viaHole = false; walkToCommons(l, f.den); } else placeAtHangout(l);
+  }
+}
+
+const NEON = ['#f3a0c4', '#ff7eb6'];
+const BOTTLES = ['#7fd3a0', '#c2563f', '#d9a441', '#8fc4ff', '#e2d3b5', '#9b6ad1'];
+const SCREEN_COLS = ['#7fd3a0', '#8fc4ff', '#ffd77e', '#f3a0c4'];
+const playing = h => COMMONS.foxes.some(f => f.spot === h && !f.travel && f.state === h.state);
+function drawBar(t) {
+  box(2.3, 0.02, 2.2, 0.14, 4, 32, B('#5e4330'));
+  BOTTLES.forEach((c, k) => { const p = iso(2.45 + k * 0.36, 0.1, 36); ctx.fillStyle = c; ctx.fillRect(p[0] - 2, p[1] - 10, 4, 10); ctx.fillRect(p[0] - 1, p[1] - 13, 2, 3); });
+  const sign = iso(3.4, 0.02, 50);
+  ctx.font = `800 12px ${FONT}`; ctx.textAlign = 'center';
+  ctx.fillStyle = NEON[Math.floor(t * 1.3) % 7 ? 0 : 1]; ctx.fillText('BAR', sign[0], sign[1]); ctx.textAlign = 'left';
+  box(2.2, 0.3, 2.4, 0.6, 22, 0, B('#6b4a30'));
+  HANGOUTS.filter(h => h.act === 'drink').forEach(h => {
+    if (!playing(h)) return;
+    const m = iso(h.x, 0.75, 22); ctx.fillStyle = '#f1e4c6'; ctx.fillRect(m[0] - 3, m[1] - 7, 6, 7); ctx.fillStyle = '#ffd77e'; ctx.fillRect(m[0] - 2, m[1] - 6, 4, 2);
+  });
+}
+function drawStool(h) { box(h.x - 0.16, h.y - 0.16, 0.32, 0.32, STOOL_Z, 0, B('#8a6240')); }
+function drawArcade(y0, t) {
+  box(0.35, y0, 0.6, 0.8, 40, 0, B('#5d3a6e'));
+  const on = playing(HANGOUTS.find(h => h.label === 'playing arcade' && Math.abs(h.y - (y0 + 0.4)) < 0.2));
+  poly([iso(0.96, y0 + 0.1, 22), iso(0.96, y0 + 0.7, 22), iso(0.96, y0 + 0.7, 34), iso(0.96, y0 + 0.1, 34)], on ? SCREEN_COLS[Math.floor(t * 4 + y0) % 4] : '#2a3440');
+  poly([iso(0.96, y0 + 0.04, 36), iso(0.96, y0 + 0.76, 36), iso(0.96, y0 + 0.76, 40), iso(0.96, y0 + 0.04, 40)], NEON[0]);
+}
+function drawTv(t) {
+  box(0.3, 3.4, 0.55, 1.0, 14, 0, B('#5e4330'));
+  box(0.35, 3.45, 0.12, 0.9, 18, 16, B('#1d2226'));
+  const on = playing(HANGOUTS.find(h => h.label === 'playing video games'));
+  poly([iso(0.48, 3.5, 18), iso(0.48, 4.3, 18), iso(0.48, 4.3, 32), iso(0.48, 3.5, 32)], on ? '#20324a' : '#14191d');
+  if (!on) return;
+  for (let k = 0; k < 2; k++) { // two little racers on the screen
+    const u = (t * (0.35 + k * 0.12) + k * 0.4) % 1, y = 3.55 + u * 0.65, z = 21 + k * 5;
+    poly([iso(0.485, y, z), iso(0.485, y + 0.07, z), iso(0.485, y + 0.07, z + 3), iso(0.485, y, z + 3)], SCREEN_COLS[k + 1]);
+  }
+  box(0.55, 3.7, 0.2, 0.3, 3, 14, B('#2b2b2b')); // the console
+}
+function drawPongTable(t) {
+  box(3.4, 2.4, 2.4, 1.0, TABLE_Z, 0, B('#2f6b4f'));
+  line(iso(3.4, PONG_Y, TABLE_Z + 0.2), iso(5.8, PONG_Y, TABLE_Z + 0.2), '#e8e0d0', 1);
+  poly([iso(4.6, 2.4, TABLE_Z), iso(4.6, 3.4, TABLE_Z), iso(4.6, 3.4, TABLE_Z + 6), iso(4.6, 2.4, TABLE_Z + 6)], 'rgba(230,230,230,.65)');
+  if (!playing(pongSpot(0)) || !playing(pongSpot(1))) return;
+  // the ball: high at each paddle and over the net, bouncing once on each half
+  const u = (t * 0.9) % 2, s = u < 1 ? u : 2 - u, bx = PONG_X0 + 0.5 + s * (PONG_X1 - PONG_X0 - 1), by = PONG_Y + 0.2 * Math.sin(t * 1.3);
+  const bz = TABLE_Z + 2 + 18 * Math.abs(Math.cos(2 * Math.PI * s)), sh = iso(bx, by, TABLE_Z), b = iso(bx, by, bz);
+  ell(sh[0], sh[1], 3, 1.4, 'rgba(0,0,0,.3)'); ell(b[0], b[1], 2.8, 2.8, '#fbf7ee');
+}
+function drawCouch() {
+  box(1.8, 4.5, 2.0, 0.7, COUCH_Z, 0, B(P.couch));
+  box(1.8, 4.5, 2.0, 0.2, 24, 0, B(P.couch));
+  box(1.8, 4.5, 0.2, 0.7, 16, 0, B(P.couch)); box(3.6, 4.5, 0.2, 0.7, 16, 0, B(P.couch));
+}
+function drawCommons(d, t) {
+  drawPitShell(d, P.lobby, P.lobbyB);
+  drawWallHole(d);
+  poly([iso(2.9, 2.0), iso(6.7, 2.0), iso(6.7, 3.8), iso(2.9, 3.8)], d.rug[0]);
+  poly([iso(3.05, 2.15), iso(6.55, 2.15), iso(6.55, 3.65), iso(3.05, 3.65)], d.rug[1]);
+  // dance floor: tiles take turns lighting up
+  for (let i = 0; i < 4; i++) for (let j = 0; j < 2; j++) {
+    const x = 4.4 + i * 0.45, y = 4.3 + j * 0.45, c = SCREEN_COLS[(i + j + Math.floor(t * 2)) % 4];
+    ctx.globalAlpha = 0.45; poly([iso(x, y), iso(x + 0.42, y), iso(x + 0.42, y + 0.42), iso(x, y + 0.42)], c); ctx.globalAlpha = 1;
+  }
+  [[1.5, 3.9, '#4f78a6'], [7.0, 1.9, P.cush]].forEach(([x, y, c]) => { const p = iso(x, y); ell(p[0], p[1] + 2, 24, 11, c); });
+  // the Commons fills a whole grid cell, so its far corner gets a reading nook
+  poly([iso(7.4, 6.6), iso(11.6, 6.6), iso(11.6, 9.8), iso(7.4, 9.8)], d.rug[1]);
+  poly([iso(7.6, 6.8), iso(11.4, 6.8), iso(11.4, 9.6), iso(7.6, 9.6)], d.rug[0]);
+  [[8.6, 8.2, P.cush], [10.2, 7.8, '#4f78a6'], [9.6, 9.0, P.cush]].forEach(([x, y, c]) => { const p = iso(x, y); ell(p[0], p[1] + 2, 20, 9, c); });
+  drawLantern(d, 7.6);
+  const items = [
+    { d: 12.4, fn: () => drawPlant(11.4, 1.0) }, { d: 10.2, fn: () => drawPlant(1.0, 9.2) },
+    { d: 1.8, fn: () => drawBar(t) },
+    { d: 2.0, fn: () => drawArcade(1.3, t) }, { d: 3.0, fn: () => drawArcade(2.3, t) },
+    { d: 4.2, fn: () => drawTv(t) },
+    { d: 7.3, fn: () => drawPongTable(t) },
+    { d: 6.6, fn: drawCouch },
+    { d: 10.6, fn: () => drawPlant(7.0, 3.6) },
+  ];
+  HANGOUTS.filter(h => h.act === 'drink').forEach(h => items.push({ d: h.x + h.y - 0.05, fn: () => drawStool(h) }));
+  d.foxes.filter(f => !f.onGrass).forEach(f => items.push({ d: f.x + f.y, fn: () => drawFox(f, t) }));
+  items.sort((a, b) => a.d - b.d).forEach(i => i.fn());
+}
+
+/* ---------- busy foxes: what a fox is doing drifts up off it as little glyphs ---------- */
+const GLYPHS = {
+  think: { chars: ['?', '…', '*', '~', '!?'], color: '#cfe3ff' },
+  type: { chars: ['{ }', ';', '</>', '=>', '()', '+1'], color: '#9be6ff' },
+  read: { chars: ['¶', '#', 'Aa', '§'], color: '#f1e4c6' },
+  bash: { chars: ['$', '>_', '&&', 'ok'], color: '#6ff0a0' },
+  gaze: { chars: ['www', '@', '?'], color: '#8fc4ff' },
+  task: { chars: ['+', '>>', 'go'], color: '#ffd77e' },
+  game: { chars: ['★', '+10', '♪', 'GG'], color: '#f3a0c4' },
+  pong: { chars: ['pok', '+1'], color: '#fbf7ee' },
+  drink: { chars: ['♪', 'cheers', '♥'], color: '#ffb38a' },
+};
+function emitGlyph(d, f, dt) {
+  f.glyphT = (f.glyphT ?? 0) - dt;
+  if (f.glyphT > 0) return;
+  const act = f.state === 'working' ? f.act : 'think', g = GLYPHS[act];
+  f.glyphT = act === 'think' ? rnd(0.7, 1.2) : rnd(0.35, 0.7);
+  if (!g || (d !== COMMONS && !roomShown(d))) return;
+  const [sx, sy] = wpos(f);
+  d.parts.push({ kind: 'glyph', text: g.chars[Math.floor(R() * g.chars.length)], color: g.color, size: rnd(10, 13),
+    x: sx + rnd(-10, 10), y: sy - 46, vx: rnd(-8, 8), vy: rnd(-26, -18), life: 1.6, max: 1.6 });
+}
+const PACE_EVERY = [5, 9];
+// a thinking fox gets up every few seconds, takes a few steps away from its desk, pauses, and comes back
+function pace(f, dt) {
+  f.paceT = (f.paceT || 0) + dt;
+  if (f.paceT < (f.paceAt ??= rnd(...PACE_EVERY))) return;
+  f.paceT = 0; f.paceAt = rnd(...PACE_EVERY);
+  const desk = spotFor(f, 'desk');
+  f.cur = { k: 'pace' };
+  goTo(f, { x: desk.x + rnd(-0.9, 0.9), y: desk.y + rnd(0.5, 1.1), face: R() < 0.5 ? 1 : -1, st: 'pace' });
+}
+
+/* ---------- the grounds: one sloping lawn to every edge of the screen, a river, trees, flowers and wildlife ----------
+   Nothing outdoors stands in front of a room, where its sprite would hang over a fox, or just behind it, where its
+   grass hole and the walk to it are. Any slot can open, so every slot's zone stays clear. */
+const ALL_RECTS = [[0, 0, GRID_MAX * CELL_W, GRID_MAX * CELL_H]];
+const WORLD = { x0: -60, x1: 130, y0: -40, y1: 110 };
+const RIVER_X = -9.5, RIVER_HW = 0.85, BRIDGE_Y = 22; // the river runs down the hill along the left of the cluster
+const riverX = y => RIVER_X + 0.9 * Math.sin(y / 3.1) + 0.35 * Math.sin(y / 1.7 + 1);
+const inRiver = (x, y, pad = 0) => Math.abs(x - riverX(y)) < RIVER_HW + pad;
+const BEHIND = 2.8;    // the lawn kept clear behind and left of a room, for its grass hole and the walk to it
+const FRONT = 3.6;     // and in front of and right of it, where a sprite would hang over the floor
+const nearRoom = (ox, oy, w, h, x, y, pad) => x > ox - BEHIND - pad && x < ox + w + FRONT + pad && y > oy - BEHIND - pad && y < oy + h + FRONT + pad;
+const clearOfAllRooms = (x, y, pad) => !ALL_RECTS.some(([ox, oy, w, h]) => nearRoom(ox, oy, w, h, x, y, pad));
+const clearOfOpenRooms = (x, y, pad) => ![COMMONS, ...openDens()].some(d => nearRoom(d.ox, d.oy, d.w, d.h, x, y, pad));
+const onLand = (x, y, pad = 0.5) => x > WORLD.x0 && x < WORLD.x1 && y > WORLD.y0 && y < WORLD.y1
+  && !inRiver(x, y, pad + 0.4) && clearOfOpenRooms(x, y, pad);
+
+function seeded(n) { let s = n; return () => (s = (s * 16807) % 2147483647) / 2147483647; }
+const rng = seeded(1234);
+// fixed scenery, placed once: clear of every slot (any of them may open), the river and the bridge
+function scatter(n, pad) {
+  const out = [];
+  for (let k = 0; k < n * 12 && out.length < n; k++) {
+    const x = WORLD.x0 + rng() * (WORLD.x1 - WORLD.x0), y = WORLD.y0 + rng() * (WORLD.y1 - WORLD.y0);
+    if (clearOfAllRooms(x, y, pad) && !inRiver(x, y, pad + 0.6) && Math.hypot(x - riverX(BRIDGE_Y), y - BRIDGE_Y) > 3) out.push({ x, y, z: groundZ(x, y), r: rng() });
+  }
+  return out;
+}
+const TREES = scatter(130, 2.5).map(tr => ({ ...tr, pine: tr.r < 0.45 }));
+const BUSHES = scatter(80, 1);
+const FLOWERS = scatter(450, 0.3);
+const ROCKS = scatter(60, 0.6);
+const FLOWER_COLS = ['#f3a0c4', '#ffd77e', '#f1e9dc', '#8fc4ff', '#c9a0f3'];
+
+// the tiles on screen: the slope is a plane, so each screen corner maps straight back to a tile; padded
+function visibleTiles(pad) {
+  const pts = [[0, 0], [scr.w, 0], [0, scr.h], [scr.w, scr.h]].map(([px, py]) => {
+    const [wx, wy] = toWorld(px, py), sum = (wy + G_TOP) / (TH / 2 + SLOPE), diff = wx / (TW / 2);
+    return [(sum + diff) / 2, (sum - diff) / 2];
+  });
+  const xs = pts.map(p => p[0]), ys = pts.map(p => p[1]);
+  return { x0: Math.min(...xs) - pad, x1: Math.max(...xs) + pad, y0: Math.min(...ys) - pad, y1: Math.max(...ys) + pad };
+}
+const inView = (v, x, y) => x > v.x0 && x < v.x1 && y > v.y0 && y < v.y1;
+// the lawn over the visible tiles: mowing stripes and tufts of grass, all following the slope
+function lawn(v) {
+  const quad = (xa, ya, xb, yb) => [[xa, ya], [xb, ya], [xb, yb], [xa, yb]].map(([x, y]) => iso(x, y, groundZ(x, y)));
+  poly(quad(v.x0, v.y0, v.x1, v.y1), P.grassB);
+  for (let j = Math.floor(v.y0 / 2) * 2; j < v.y1; j += 2) { const a = Math.max(j, v.y0), b = Math.min(j + 1, v.y1); if (a < b) poly(quad(v.x0, a, v.x1, b), P.grassA); }
+  if (view.s <= 0.3) return;
+  const tufts = new Path2D(); // every tuft in one stroke
+  for (let i = Math.floor(v.x0 / 2); i < v.x1 / 2; i++) for (let j = Math.floor(v.y0 / 2); j < v.y1 / 2; j++) {
+    const r = ((i * 73856093) ^ (j * 19349663)) >>> 0;
+    if (r % 4) continue;
+    const u = i * 2 + (r % 13) / 7, w = j * 2 + (r % 11) / 6, z = groundZ(u, w);
+    [-0.08, 0, 0.08].forEach((dd, k) => { const a = iso(u + dd, w, z), b = iso(u + dd * 1.6, w - 0.05, z + 6 + (k % 2) * 3); tufts.moveTo(a[0], a[1]); tufts.lineTo(b[0], b[1]); });
+  }
+  ctx.strokeStyle = P.blade; ctx.lineWidth = 1.4; ctx.stroke(tufts);
+}
+function drawGrounds(t) {
+  OFF = [0, 0]; OFFZ = 0;
+  const v = visibleTiles(2);
+  lawn(v);
+  drawRiver(t, v);
+  ROCKS.forEach(rk => { if (inView(v, rk.x, rk.y)) drawRock(rk); });
+  if (view.s > 0.35) drawFlowers(v);
+}
+// the river runs down the slope: banks and water follow the ground, ripples drift downhill
+function drawRiver(t, v) {
+  if (v.x1 < RIVER_X - 4 || v.x0 > RIVER_X + 4) return;
+  const ys = [];
+  for (let y = v.y0; y <= v.y1 + 0.5; y += 0.5) ys.push(y);
+  const edge = (y, w, dz) => { const x = riverX(y) + w; return iso(x, y, groundZ(x, y) + dz); };
+  const band = (w, dz) => [...ys.map(y => edge(y, -w, dz)), ...ys.slice().reverse().map(y => edge(y, w, dz))];
+  poly(band(RIVER_HW + 0.35, -1), P.bank);
+  poly(band(RIVER_HW, -3), P.water);
+  for (let y = Math.floor(v.y0); y < v.y1; y += 1.1) {
+    const yy = y + (t * 0.7) % 1.1, x = riverX(yy) + Math.sin(yy * 2.3) * 0.45, z = groundZ(x, yy) - 2;
+    line(iso(x - 0.22, yy, z), iso(x + 0.22, yy, z), P.ripple, 1.4);
+  }
+}
+// every flower on screen in six fills (stems, then one per petal colour)
+function drawFlowers(v) {
+  const stems = new Path2D(), petals = FLOWER_COLS.map(() => new Path2D());
+  for (const fl of FLOWERS) {
+    if (!inView(v, fl.x, fl.y)) continue;
+    const c = iso(fl.x, fl.y, fl.z);
+    for (let k = 0; k < 3; k++) {
+      const dx = (k - 1) * 4, dy = (k % 2) * 2;
+      stems.rect(c[0] + dx, c[1] + dy - 4, 1, 4);
+      petals[Math.floor(fl.r * 5 + k) % 5].rect(c[0] + dx - 1.5, c[1] + dy - 6.5, 3, 3);
+    }
+  }
+  ctx.fillStyle = P.blade; ctx.fill(stems);
+  petals.forEach((path, i) => { ctx.fillStyle = FLOWER_COLS[i]; ctx.fill(path); });
+}
+function drawRock(rk) {
+  const c = iso(rk.x, rk.y, rk.z), s = 5 + rk.r * 6;
+  ell(c[0], c[1] + 1, s * 1.2, s * 0.55, 'rgba(0,0,0,.25)');
+  ell(c[0], c[1] - s * 0.3, s, s * 0.6, '#6b6f6a'); ell(c[0] - s * 0.3, c[1] - s * 0.5, s * 0.4, s * 0.22, '#8a8f88');
+}
+function drawTree(tr, t) {
+  const [sx, sy] = iso(tr.x, tr.y, tr.z), s = 0.8 + tr.r * 0.5, sway = Math.sin(t * 0.7 + tr.r * 9) * 1.2 * s;
+  ell(sx + 6 * s, sy + 2, 20 * s, 7 * s, 'rgba(0,0,0,.25)');
+  ctx.fillStyle = '#5b3d26'; ctx.fillRect(sx - 3 * s, sy - 20 * s, 6 * s, 20 * s);
+  if (tr.pine) {
+    [['#24472f', 18, 22], ['#2b5537', 34, 17], ['#336140', 48, 11]].forEach(([c, base, w]) => {
+      ctx.fillStyle = c; ctx.beginPath();
+      ctx.moveTo(sx - w * s, sy - base * s); ctx.lineTo(sx + w * s, sy - base * s); ctx.lineTo(sx + sway, sy - (base + 26) * s);
+      ctx.closePath(); ctx.fill();
+    });
+  } else {
+    [[0, 36, 20, '#2e5a34'], [-11, 30, 13, '#2a5230'], [11, 31, 14, '#33633a'], [2, 46, 14, '#3a6d40']]
+      .forEach(([dx, h, r, c]) => ell(sx + dx * s + sway, sy - h * s, r * s, r * 0.85 * s, c));
+  }
+}
+function drawBush(b) {
+  const [sx, sy] = iso(b.x, b.y, b.z), s = 0.7 + b.r * 0.5;
+  ell(sx, sy + 1, 14 * s, 5 * s, 'rgba(0,0,0,.22)');
+  [[-6, 7, 8], [6, 7, 8], [0, 11, 9]].forEach(([dx, h, r], i) => ell(sx + dx * s, sy - h * s, r * s, r * 0.8 * s, i === 2 ? '#3a6d40' : '#2e5a34'));
+  if (b.r > 0.5) [[-5, 10], [4, 13], [1, 7]].forEach(([dx, h]) => { ctx.fillStyle = '#e0605a'; ctx.fillRect(sx + dx * s, sy - h * s, 2, 2); });
+}
+function drawBridge() {
+  const cx = riverX(BRIDGE_Y), x0 = cx - 1.7, x1 = cx + 1.7, y0 = BRIDGE_Y - 0.5, y1 = BRIDGE_Y + 0.5, n = 10;
+  const zAt = k => groundZ(x0 + (x1 - x0) * k / n, BRIDGE_Y) + 2 + 7 * Math.sin(Math.PI * k / n);
+  for (let k = 0; k < n; k++) {
+    const a = x0 + (x1 - x0) * k / n, b = a + (x1 - x0) / n - 0.03, z = zAt(k + 0.5);
+    poly([iso(a, y0, z), iso(b, y0, z), iso(b, y1, z), iso(a, y1, z)], k % 2 ? '#8a6240' : '#7b5536');
+  }
+  [y0, y1].forEach(y => {
+    for (let k = 0; k <= n; k += 2) { const x = x0 + (x1 - x0) * k / n; line(iso(x, y, zAt(k)), iso(x, y, zAt(k) + 9), '#5e4330', 2); }
+    for (let k = 0; k < n; k++) line(iso(x0 + (x1 - x0) * k / n, y, zAt(k) + 9), iso(x0 + (x1 - x0) * (k + 1) / n, y, zAt(k + 1) + 9), '#6b4a30', 2);
+  });
+}
+
+/* ---------- wildlife: birds, squirrels, deer, ducks and butterflies ---------- */
+const BIRD = {
+  stand: norm(['...oo..', '..okoy.', 'oooccc.', '.ddcc..', '..k.k..']),
+  peck: norm(['.......', '.ooo...', 'odddoo.', '..ccoky', '..k.k..']),
+  flyA: norm(['d.....d', 'dd...dd', '.ddodd.', '..oco..', '.......']),
+  flyB: norm(['.......', '..ooo..', 'ddoccdd', 'd.....d', '.......']),
+};
+const BIRD_PALS = [{ o: '#7a5a44', c: '#e3793e', d: '#5e4535', k: INK, y: '#f2c14e' },
+  { o: '#4f7fb8', c: '#e8b38a', d: '#3c628f', k: INK, y: '#f2c14e' }, { o: '#8b7a64', c: '#d9c9a8', d: '#6b5c48', k: INK, y: '#e0b050' }];
+const SQUIRREL = {
+  runA: norm(['tt.......', 'ttt...oo.', '.tt.oooko', '..ooocco.', '..k...k..']),
+  runB: norm(['.tt......', 'ttt...oo.', 'tt.ooooko', '..ooocc..', '...k.k...']),
+  sit: norm(['tt....oo.', 'ttt..ooko', '.tt.occo.', '..ttoccc.', '....kk...']),
+};
+const SQ_PAL = { t: '#b86a35', o: '#a0582c', c: '#e8c99a', k: INK };
+const DEER = {
+  stand: norm(['...........e.e', '...........ooo', '..........ookoo', '...........oc', '.ooooooooooo', 'ooooooooooo', 'occcccccooo', '.o.o.....o.o', '.o.o.....o.o', '.k.k.....k.k']),
+  graze: norm(['', '', '', '', '.oooooooooo', 'ooooooooooooo', 'occcccccoooooo', '.o.o.....o.eoo', '.o.o.....o.okoo', '.k.k.....k..cc']),
+};
+const DEER_PAL = { o: '#8a5a34', c: '#e9d6b0', k: INK, e: '#6b4426' };
+const DUCK = norm(['.....gg..', '....gkgyy', 'oowwoooo.', '.oooooo..']);
+const DUCK_PAL = { g: '#2f6b45', o: '#c9b38a', w: '#8a7a5c', y: '#e9a03b', k: INK };
+const BUTTERFLY_COLS = ['#f3a0c4', '#ffd77e', '#8fc4ff', '#f1e9dc'];
+
+const critters = [], flocks = [];
+// a spot to stand: on land, optionally within `radius` of `near`
+function landSpot(near, radius, pad = 0.6) {
+  for (let k = 0; k < 40; k++) {
+    const x = near ? near.x + (R() * 2 - 1) * radius : rnd(WORLD.x0, WORLD.x1);
+    const y = near ? near.y + (R() * 2 - 1) * radius : rnd(WORLD.y0, WORLD.y1);
+    if (onLand(x, y, pad)) return { x, y };
+  }
+  return null;
+}
+function spawnWildlife() {
+  for (let n = 0; n < 3; n++) {
+    const home = landSpot(null); if (!home) continue;
+    const flock = { ...home, timer: rnd(8, 16), birds: [] };
+    for (let k = 0; k < 4; k++) {
+      const b = { kind: 'bird', flock, pal: BIRD_PALS[n % 3], x: home.x + rnd(-0.8, 0.8), y: home.y + rnd(-0.8, 0.8), z: groundZ(home.x, home.y), state: 'peck', timer: rnd(0.3, 2), dir: R() < 0.5 ? 1 : -1, phase: R() * 10 };
+      flock.birds.push(b); critters.push(b);
+    }
+    flocks.push(flock);
+  }
+  TREES.filter(tr => !tr.pine).slice(0, 3).forEach(tr => {
+    const a = { kind: 'squirrel', x: tr.x + 1, y: tr.y + 0.5, z: tr.z, home: tr, state: 'sit', timer: rnd(0.5, 2), dir: 1, hop: 0, phase: R() * 10, lead: true };
+    const b = { ...a, x: a.x + 1, lead: false, phase: R() * 10 };
+    a.mate = b; b.mate = a; critters.push(a, b);
+  });
+  for (let k = 0; k < 3; k++) { const s = landSpot(null, 0, 1.2); if (s) critters.push({ kind: 'deer', ...s, z: groundZ(s.x, s.y), state: 'graze', timer: rnd(3, 8), dir: R() < 0.5 ? 1 : -1, phase: R() * 10 }); }
+  for (let k = 0; k < 3; k++) {
+    const y = rnd(WORLD.y0 + 5, WORLD.y1 - 5), off = rnd(-0.4, 0.4), x = riverX(y) + off;
+    critters.push({ kind: 'duck', x, y, off, z: groundZ(x, y) - 3, dirY: R() < 0.5 ? 1 : -1, dir: 1, phase: R() * 10 });
+  }
+  FLOWERS.slice(0, 6).forEach(fl => critters.push({ kind: 'butterfly', x: fl.x, y: fl.y, z: fl.z + 14, tx: fl.x, ty: fl.y, col: BUTTERFLY_COLS[Math.floor(fl.r * 4)], dir: 1, phase: R() * 10 }));
+}
+spawnWildlife();
+
+function stepToward(c, tx, ty, speed, dt) {
+  const dx = tx - c.x, dy = ty - c.y, dist = Math.hypot(dx, dy);
+  if (Math.abs(dx - dy) > 0.01) c.dir = dx - dy > 0 ? 1 : -1;
+  if (dist <= speed * dt) { c.x = tx; c.y = ty; return true; }
+  c.x += dx / dist * speed * dt; c.y += dy / dist * speed * dt;
+  return false;
+}
+// a flock pecks around one spot, then takes off together; a room opening under it scares it off early
+function tickFlock(fl, dt) {
+  fl.timer -= dt;
+  const spooked = fl.birds.some(b => b.state !== 'fly' && !onLand(b.x, b.y, 0.2));
+  if (fl.timer > 0 && !spooked) return;
+  const home = landSpot(null) || fl;
+  Object.assign(fl, { x: home.x, y: home.y, timer: rnd(10, 20) });
+  fl.birds.forEach(b => Object.assign(b, { state: 'fly', sx: b.x, sy: b.y, sz: groundZ(b.x, b.y), tz: groundZ(home.x, home.y), tx: home.x + rnd(-0.8, 0.8), ty: home.y + rnd(-0.8, 0.8) }));
+}
+const TICK = {
+  bird(b, dt) {
+    if (b.state === 'fly') {
+      const total = Math.hypot(b.tx - b.sx, b.ty - b.sy) || 1, done = stepToward(b, b.tx, b.ty, 6, dt);
+      const k = 1 - Math.hypot(b.tx - b.x, b.ty - b.y) / total; // a bird crosses tiers, so its height eases from one ground to the other
+      b.z = b.sz + (b.tz - b.sz) * k + 6 + Math.sin(Math.PI * k) * 60;
+      if (done) Object.assign(b, { state: 'peck', z: b.tz, timer: rnd(0.4, 1.5) });
+      return;
+    }
+    if (b.state === 'hop') {
+      const gz = groundZ(b.x, b.y);
+      if (stepToward(b, b.tx, b.ty, 1.6, dt)) Object.assign(b, { state: 'peck', z: gz, timer: rnd(0.5, 2.2) });
+      else b.z = gz + Math.abs(Math.sin((simT + b.phase) * 12)) * 4;
+      return;
+    }
+    if ((b.timer -= dt) > 0) return;
+    const fl = b.flock;
+    Object.assign(b, { state: 'hop', tx: fl.x + rnd(-0.9, 0.9), ty: fl.y + rnd(-0.9, 0.9) });
+  },
+  // two squirrels play tag: one dashes about near its tree, the other chases; on a catch they swap
+  squirrel(s, dt) {
+    if (s.hop > 0) s.hop -= dt;
+    if (s.state === 'sit' && !onLand(s.x, s.y, 0.2)) { s.lead = true; s.mate.lead = false; s.timer = 0; } // scamper out of a room that opened
+    if (s.lead) {
+      if (s.state === 'run') { if (stepToward(s, s.tx, s.ty, 4.6, dt)) Object.assign(s, { state: 'sit', timer: rnd(0.3, 1.4) }); }
+      else if ((s.timer -= dt) <= 0) { const p = landSpot(s.home, 4, 0.3) || s.home; Object.assign(s, { state: 'run', tx: p.x, ty: p.y }); }
+    } else {
+      const m = s.mate;
+      if (Math.hypot(m.x - s.x, m.y - s.y) > 0.45) { s.state = 'run'; stepToward(s, m.x, m.y, 4.2, dt); }
+      else if (m.state === 'sit') { s.state = 'sit'; s.lead = true; m.lead = false; s.timer = rnd(0.2, 0.8); s.hop = m.hop = 0.35; }
+    }
+    s.z = groundZ(s.x, s.y) + (s.state === 'run' ? Math.abs(Math.sin((simT + s.phase) * 14)) * 3 : 0) + (s.hop > 0 ? Math.sin(s.hop / 0.35 * Math.PI) * 8 : 0);
+  },
+  deer(d, dt) {
+    if (d.state !== 'walk' && !onLand(d.x, d.y, 0.8)) {
+      const p = landSpot(d, 10, 1.2) || landSpot(null, 0, 1.2); // a room opened underfoot: trot off, far if need be
+      if (p) Object.assign(d, { state: 'walk', tx: p.x, ty: p.y, speed: 2.2 });
+    }
+    d.z = groundZ(d.x, d.y);
+    if (d.state === 'walk') { if (stepToward(d, d.tx, d.ty, d.speed, dt)) Object.assign(d, { state: 'graze', timer: rnd(4, 9) }); return; }
+    if ((d.timer -= dt) > 0) return;
+    if (d.state === 'graze') { Object.assign(d, { state: 'look', timer: rnd(1.5, 3.5) }); return; }
+    const p = R() < 0.6 ? landSpot(d, 6, 1.2) : null;
+    if (p) Object.assign(d, { state: 'walk', tx: p.x, ty: p.y, speed: 0.8 }); else Object.assign(d, { state: 'graze', timer: rnd(4, 9) });
+  },
+  duck(k, dt) {
+    k.y += k.dirY * 0.35 * dt;
+    if (k.y < WORLD.y0 + 3 || k.y > WORLD.y1 - 3 || R() < dt * 0.02) k.dirY *= -1;
+    k.x = riverX(k.y) + k.off; k.z = groundZ(k.x, k.y) - 3; k.dir = -k.dirY;
+  },
+  butterfly(b, dt) {
+    if (Math.hypot(b.tx - b.x, b.ty - b.y) < 0.2) {
+      const fl = FLOWERS[Math.floor(R() * FLOWERS.length)];
+      if (fl && Math.hypot(fl.x - b.x, fl.y - b.y) < 8) { b.tx = fl.x; b.ty = fl.y; } else { b.tx = b.x + rnd(-2, 2); b.ty = b.y + rnd(-2, 2); }
+    }
+    stepToward(b, b.tx, b.ty, 0.9, dt);
+    b.z = groundZ(b.x, b.y) + 12 + Math.sin((simT + b.phase) * 3) * 5;
+  },
+};
+function tickWildlife(dt) {
+  if (!dt) return;
+  flocks.forEach(fl => tickFlock(fl, dt));
+  critters.forEach(c => TICK[c.kind](c, dt));
+}
+function drawCritter(c, t) {
+  const [gx, gy] = iso(c.x, c.y, groundZ(c.x, c.y)), [sx, sy] = iso(c.x, c.y, c.z), ph = t + c.phase;
+  const sprite = (rows, pal, p, lift = 0) => pix(rows, sx - rows[0].length * p / 2, sy - rows.length * p - lift, pal, c.dir < 0, p);
+  switch (c.kind) {
+    case 'bird': {
+      const fly = c.state === 'fly';
+      ell(gx, gy, fly ? 4 : 5, 2, 'rgba(0,0,0,.25)');
+      sprite(fly ? (Math.floor(ph * 12) % 2 ? BIRD.flyA : BIRD.flyB) : c.state === 'peck' && Math.floor(ph * 3) % 2 ? BIRD.peck : BIRD.stand, c.pal, 1.7);
+      break;
+    }
+    case 'squirrel':
+      ell(gx, gy, 7, 2.5, 'rgba(0,0,0,.25)');
+      sprite(c.state === 'run' ? (Math.floor(ph * 10) % 2 ? SQUIRREL.runA : SQUIRREL.runB) : SQUIRREL.sit, SQ_PAL, 1.8);
+      break;
+    case 'deer': {
+      const p = 2.5, bob = c.state === 'walk' ? (Math.floor(ph * 6) % 2) * p * 0.5 : c.state === 'graze' ? (Math.floor(ph * 1.5) % 2) * p * 0.5 : 0;
+      ell(gx, gy, 18, 5, 'rgba(0,0,0,.25)');
+      sprite(c.state === 'graze' ? DEER.graze : DEER.stand, DEER_PAL, p, bob);
+      break;
+    }
+    case 'duck':
+      ell(sx, sy + 1, 9, 2.5, 'rgba(190,225,240,.25)');
+      sprite(DUCK, DUCK_PAL, 1.8, Math.sin(ph * 2) * 1.2);
+      break;
+    case 'butterfly':
+      ctx.fillStyle = c.col;
+      if (Math.floor(ph * 10) % 2) { ctx.fillRect(sx - 4, sy - 3, 3, 3); ctx.fillRect(sx + 1, sy - 3, 3, 3); }
+      else { ctx.fillRect(sx - 2, sy - 4, 2, 4); ctx.fillRect(sx, sy - 4, 2, 4); }
+      ctx.fillStyle = INK; ctx.fillRect(sx - 0.5, sy - 4, 1, 4);
+      break;
+  }
+}
+// everything standing on the ground, back to front; things in the air go on top
+function drawOutdoors(t) {
+  OFF = [0, 0];
+  const v = visibleTiles(6), items = [];
+  TREES.forEach(tr => { if (inView(v, tr.x, tr.y)) items.push({ d: tr.x + tr.y, fn: () => drawTree(tr, t) }); });
+  BUSHES.forEach(b => { if (inView(v, b.x, b.y)) items.push({ d: b.x + b.y, fn: () => drawBush(b) }); });
+  if (inView(v, riverX(BRIDGE_Y), BRIDGE_Y)) items.push({ d: riverX(BRIDGE_Y) + BRIDGE_Y, fn: drawBridge });
+  [COMMONS, ...openDens()].forEach(d => d.foxes.filter(f => f.onGrass && !f.away).forEach(f => items.push({ d: d.ox + f.x + d.oy + f.y,
+    fn: () => { OFF = [d.ox, d.oy]; OFFZ = d.z0; drawFox(f, t); OFF = [0, 0]; OFFZ = 0; } })));
+  critters.forEach(c => { if (inView(v, c.x, c.y)) items.push({ d: c.x + c.y + (c.z - groundZ(c.x, c.y) > 20 ? 1e4 : 0), fn: () => drawCritter(c, t) }); });
+  items.sort((a, b) => a.d - b.d).forEach(i => i.fn());
+}
+
+/* ---------- live mode: real events from `foxhole serve` drive the foxes ----------
+   One fox per session, in its repo's room, at its branch's corner. Between events a fox idles
+   at its desk or wanders the rug; after a quiet spell it curls up in bed. */
+const NAP_AFTER = ROOM_IDLE;    // seconds of silence before an awake fox goes to bed (its room closes behind it)
+const WAIT_HOLD = 60 * 60;      // a raised paw holds this long before we assume it was answered elsewhere
+const THINK_HOLD = 15 * 60;     // an open turn with no events this long is treated as abandoned
+const LINGER = 20;              // seconds a fox keeps at a tool when no tool.end arrives
+const TOOL_TAIL = 2.5;          // seconds it stays at the station once the tool has finished
+const IDLE_BEAT = [10, 22];     // seconds between idle moves (desk ↔ rug)
+const DESKS = 2;                // desks per branch corner; the longest-quiet fox gives up its desk
+const FOX_NAMES = ['Ember', 'Juniper', 'Sage', 'Rusty', 'Moss', 'Pip', 'Fern', 'Hazel', 'Maple', 'Rowan', 'Briar', 'Clove'];
+const FURS = ['#e8772e', '#d9973a', '#c75b28', '#b9562a', '#f0a05f', '#cf6a2c'];
+const liveFoxes = new Map(), appliedIds = new Set();
+const pickFor = (list, key) => list[parseInt(hash(key).slice(2), 16) % list.length];
+// a session keeps the name its id hashes to, unless another fox on the floor already has it
+function nameFor(id) {
+  const taken = new Set([...liveFoxes.values()].map(f => f.name)), start = FOX_NAMES.indexOf(pickFor(FOX_NAMES, id));
+  for (let i = 0; i < FOX_NAMES.length; i++) { const n = FOX_NAMES[(start + i) % FOX_NAMES.length]; if (!taken.has(n)) return n; }
+  return `Fox ${liveFoxes.size + 1}`;
+}
+const ageOf = ev => Math.max(0, (Date.now() - Date.parse(ev.ts)) / 1000);
+
+function liveDen(repo) {
+  const key = repo || 'local';
+  const known = DENS.find(d => d.repo === key);
+  if (known) return known;
+  const d = makeDen(key, DENS.length);
+  DENS.push(d); buildDepts();
+  return d;
+}
+function retire(f) {
+  const br = f.den.branches[f.bIdx];
+  br.foxes = br.foxes.filter(o => o !== f); br.foxes.forEach((o, i) => { o.bDesk = i; });
+  f.den.foxes = f.den.foxes.filter(o => o !== f && o.parent !== f);
+  liveFoxes.delete(f.session); rebuildBlocked(f.den);
+  if (selected === f) selected = null;
+}
+// once through the hole, act on the latest event that arrived on the way in, then head for the desk
+function afterLiveEntry(f) {
+  const ev = f.pending; f.pending = null;
+  if (ev) react(f, ev, false);
+  if (!f.travel && f.state === 'idle') toDesk(f, false);
+}
+function liveFox(ev, instant) {
+  const id = ev.parentSessionId || ev.sessionId;
+  if (liveFoxes.has(id)) return liveFoxes.get(id);
+  if (ev.parentSessionId) return null; // a subagent whose parent session we never saw
+  const d = liveDen(ev.repo); if (!d) return null;
+  const branch = ev.branch || 'no branch', corner = d.branches.find(b => b.name === branch);
+  if (corner && corner.foxes.length >= DESKS) retire(corner.foxes.reduce((a, b) => (a.lastAt <= b.lastAt ? a : b)));
+  const f = addAgent(d, { name: nameFor(id), fur: pickFor(FURS, id), branch, source: ev.source,
+    model: ev.usage?.model || ev.source, live: true, session: id, machine: ev.machineId, lastAt: 0, idleT: 0, beat: rnd(...IDLE_BEAT) });
+  liveFoxes.set(id, f); buildDepts();
+  if (!instant) enterViaHoles(f, afterLiveEntry);
+  if (!selected) select(f);
+  return f;
+}
+
+// moves a fox to a spot: walking normally, or straight there while replaying history
+function goOrPlace(f, sp, instant) {
+  if (!instant) return goTo(f, sp);
+  Object.assign(f, { x: sp.x, y: sp.y, path: [], travel: false, target: sp });
+  if (sp.face) f.dir = sp.face;
+  arrive(f);
+}
+function toDesk(f, instant) { f.cur = { k: 'desk' }; goOrPlace(f, spotFor(f, 'desk'), instant); }
+// a fox whose session has gone quiet (or ended) walks to its room's hole and climbs out to the lawn, bound for the Commons
+function nap(f, instant) {
+  if (instant || f.den.slot == null) return Object.assign(f, { away: true, state: 'sleeping', cur: null, travel: false, path: [] });
+  const [x, y] = doorOf(f.den);
+  f.cur = { k: 'exit' };
+  goTo(f, { x, y, st: 'door' });
+}
+function halt(f, state) { Object.assign(f, { travel: false, path: [], state }); }
+function cubHeadsHome(p) {
+  const c = makeCub(p, p.x, p.y);
+  c.steps = [{ k: 'home' }];
+  p.den.foxes.push(c); burst(c, 'smoke', 6);
+}
+
+// A turn runs from prompt.submit to turn.end. No hook fires while the model thinks between tool calls,
+// so during an open turn a fox with nothing else to do sits at its desk thinking rather than idling.
+const TURN_ENDS = new Set(['turn.end', 'session.waiting', 'session.end']);
+function react(f, ev, instant) {
+  if (ev.type === 'prompt.submit') f.turnOpen = true; else if (TURN_ENDS.has(ev.type)) { f.turnOpen = false; f.thinkSince = null; }
+  if (ev.type === 'prompt.submit' || (ev.type === 'tool.end' && f.turnOpen)) f.thinkSince = simT - ageOf(ev);
+  if (f.state === 'sleeping') f.timer = 0; // any event wakes it; drop the nap timer so it can act right away
+  if (f.away) {
+    // back from the Commons: down its own room's grass hole, then on with whatever woke it
+    f.away = false; f.state = 'idle';
+    if (!instant && ensureSlot(f.den)) { f.pending = ev; enterViaHoles(f, afterLiveEntry); return; }
+  }
+  if (f.entering) { f.pending = ev; return; } // still on its way in; acts on this once it's through the hole
+  switch (ev.type) {
+    case 'session.start': case 'session.waiting': toDesk(f, instant); break;
+    case 'prompt.submit':
+      Object.assign(f, { quest: { title: `Quest ${f.done + 1}` }, qTools: 0, qErrors: 0, qStart: simT - ageOf(ev), scroll: instant ? 0 : 1.9 });
+      toDesk(f, instant); break;
+    case 'tool.start': {
+      const m = TOOL[ev.tool] || TOOL.Edit;
+      f.qTools++; f.thinkSince = null; f.cur = { k: 'tool', tool: ev.tool, target: ev.target, act: m.act, dur: LINGER, startedAt: simT - ageOf(ev) };
+      goOrPlace(f, spotFor(f, m.st), instant); break;
+    }
+    case 'tool.end':
+      if (ev.status === 'error') { if (instant) f.qErrors++; else fail(f); break; }
+      if (f.state === 'waiting') { f.state = 'idle'; f.cur = null; }
+      if (f.cur?.k === 'tool') { f.cur.dur = TOOL_TAIL; if (f.state === 'working') f.timer = Math.min(f.timer, TOOL_TAIL); }
+      break;
+    case 'permission.request': halt(f, 'waiting'); f.waitSince = simT - ageOf(ev); f.cur = { k: 'perm' }; break;
+    case 'turn.end':
+      f.done++;
+      if (instant) { toDesk(f, true); break; }
+      halt(f, 'celebrating'); f.timer = 2.8; f.cur = { k: 'stop' }; burst(f, 'confetti', reduceMotion ? 10 : 46);
+      break;
+    case 'subagent.stop': if (!instant) cubHeadsHome(f); break;
+    case 'session.end': nap(f, instant); break;
+  }
+}
+function applyLive(ev, instant) {
+  if (appliedIds.has(ev.id)) return; // a reconnect replays the backlog
+  appliedIds.add(ev.id);
+  const f = liveFox(ev, instant); if (!f) return;
+  f.lastAt = Math.max(f.lastAt, Date.parse(ev.ts));
+  if (ev.usage) { f.tIn += ev.usage.inputTokens; f.tOut += ev.usage.outputTokens; if (ev.usage.model) { f.model = ev.usage.model; f.speed = paceFor(f.model); } }
+  f.events.push({ ev, cub: !!ev.parentSessionId }); if (f.events.length > 50) f.events.shift();
+  logEvent(f, ev);
+  react(f, ev, instant);
+}
+
+// a finished timer: done working, done cheering or done stumbling, the fox stands idle
+function settle(f) {
+  if (f.state === 'sleeping' || f.state === 'waiting') return;
+  if (f.cur?.k === 'tool') { f.cur = null; f.target = null; }
+  f.state = 'idle'; f.act = null;
+}
+function liveTick(f, dt) {
+  if (f.timer > 0) { f.timer -= dt; if (f.timer <= 0) settle(f); return; }
+  if (f.state === 'walking') f.state = 'idle'; // arrived with no job there
+  const quiet = (Date.now() - f.lastAt) / 1000;
+  if (f.state === 'waiting') { if (quiet > WAIT_HOLD) nap(f); return; }
+  if (f.state === 'working' && f.act === 'think') { if (quiet > THINK_HOLD) { f.turnOpen = false; nap(f); } else pace(f, dt); return; }
+  if (f.state !== 'idle') return;
+  if (f.turnOpen) {
+    if (f.cur?.k === 'desk') { f.state = 'working'; f.act = 'think'; } else toDesk(f, false);
+    return;
+  }
+  if (quiet > NAP_AFTER) return nap(f);
+  f.idleT += dt;
+  if (f.idleT < f.beat) return;
+  f.idleT = 0; f.beat = rnd(...IDLE_BEAT);
+  if (f.cur?.k === 'desk') { f.cur = { k: 'wander' }; goTo(f, rugSpot()); } else toDesk(f, false);
+}
+// after replaying history, foxes whose sessions went quiet long ago start out asleep
+function settleReplay() {
+  for (const f of liveFoxes.values()) {
+    const quiet = (Date.now() - f.lastAt) / 1000;
+    const hold = f.state === 'waiting' ? WAIT_HOLD : f.turnOpen ? THINK_HOLD : NAP_AFTER;
+    if (f.state !== 'sleeping' && quiet > hold) { f.turnOpen = false; nap(f, true); }
+  }
+}
+
+function setConn(text, ok) {
+  $('conn').lastElementChild.textContent = text;
+  $('conn').style.color = ok ? '' : 'var(--alert)';
+}
+function startLive() {
+  $('lvl').closest('.chip').hidden = true; // XP comes later; these belong to the demo
+  document.querySelector('.seg').hidden = true;
+  $('approve').hidden = true; $('deny').hidden = true;
+  $('d-name').textContent = 'No foxes yet';
+  setConn('Connecting', false);
+  let backlog = null, first = true;
+  const es = new EventSource('/events');
+  es.onopen = () => { backlog = []; setConn('Live', true); };
+  es.onerror = () => setConn('Reconnecting', false);
+  es.onmessage = m => {
+    let ev; try { ev = JSON.parse(m.data); } catch { return; }
+    if (backlog) backlog.push(ev); else applyLive(ev, false);
+  };
+  es.addEventListener('assign', m => { try { applyAssign(JSON.parse(m.data)); } catch { /* a malformed message is ignored */ } });
+  es.addEventListener('ready', () => {
+    const replay = backlog || []; backlog = null;
+    replay.forEach(ev => applyLive(ev, true));
+    settleReplay();
+    if (!first) return;
+    first = false;
+    const n = liveFoxes.size, awake = [...liveFoxes.values()].filter(f => f.state !== 'sleeping').length;
+    if (!n) toast('Your den is empty', 'Start a Claude Code session with the Foxhole plugin and a fox will move in.');
+    else toast(`${n} fox${n > 1 ? 'es' : ''} in your HQ`, awake ? `${awake} awake right now.` : 'Everyone is asleep. They wake on the next event.');
+  });
+}
+function renderHq() {
+  const n = DENS.filter(d => d.open).length;
+  if (LIVE) $('hq').textContent = `Your HQ · ${n} active department${n === 1 ? '' : 's'}`;
+}
+
+/* ---------- den panel: a repo's tasks and pull requests; drag a task onto a fox to hand it over ----------
+   Live, the tasks come from the repo's TASKS.md and the pull requests from `gh`, both through `foxhole serve`
+   (a per-run token on every call). In the demo the same panel runs on sample data. Dropping a task on a fox
+   always asks first: the text shown is exactly what the session is handed. */
+const TOKEN = document.querySelector('meta[name="foxhole-token"]')?.content || '';
+const DEMO_TASKS = {
+  'github.com/acme/web': [
+    { id: 't-auth-1', title: 'Fix session expiry clock skew', labels: ['bug'], size: 'S', status: 'open', detail: 'Tokens expire early when the server clock drifts. Add 30 s leeway and a test.' },
+    { id: 't-csp', title: 'Add CSP headers to the dashboard', labels: ['security'], size: 'M', status: 'open' },
+    { id: 't-react', title: 'Upgrade to React 19', labels: ['chore'], size: 'L', status: 'doing' },
+    { id: 't-jose', title: 'Upgrade jose to v6', labels: [], status: 'done' },
+  ],
+  'github.com/foxhole-hq/foxhole-hq': [
+    { id: 't-pair', title: 'Pair two agents on one branch', labels: ['feature'], size: 'M', status: 'open' },
+    { id: 't-stats', title: 'Add zustand stats store', labels: ['chore'], size: 'S', status: 'open' },
+  ],
+  'github.com/acme/billing-api': [
+    { id: 't-hook', title: 'Retry failed webhooks with backoff', labels: ['bug'], size: 'M', status: 'open', detail: 'Dead-letter after five tries.' },
+  ],
+};
+const DEMO_PRS = {
+  'github.com/acme/web': [
+    { number: 212, title: 'fix: expire sessions with leeway', author: 'ember', branch: 'fix/session-expiry', draft: false, review: 'APPROVED', checks: 'pass', url: '' },
+    { number: 214, title: 'feat: CSP headers', author: 'juniper', branch: 'feat/csp-headers', draft: true, review: null, checks: 'pending', url: '' },
+  ],
+  'github.com/foxhole-hq/foxhole-hq': [{ number: 31, title: 'feat: pairing', author: 'rusty', branch: 'feat/pairing', draft: false, review: 'REVIEW_REQUIRED', checks: 'fail', url: '' }],
+  'github.com/acme/billing-api': [],
+};
+const taskKey = (repo, id) => repo + '#' + id;
+const assignments = new Map(); // taskKey -> { id, state, session, fox }
+let denPanel = null;           // { d, tab, tasks, prs, source, known, canAssign, error }
+let dragTask = null;           // { task, valid: Set of foxes, hover } while a card is being dragged
+let pendingDrop = null;        // { task, fox } waiting on the confirm popover
+
+const mk = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; };
+async function api(path, init = {}) {
+  const res = await fetch(path, { ...init, headers: { 'X-Foxhole-Token': TOKEN, ...(init.body ? { 'Content-Type': 'application/json' } : {}) } });
+  const body = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(body.error || `HTTP ${res.status}`);
+  return body;
+}
+const foxBySession = s => DENS.flatMap(d => d.foxes).find(f => f.session === s && !f.isCub);
+// the foxes a task from this den may go to: its own den's, with a session to hand it to
+const eligible = d => d.foxes.filter(f => !f.isCub && !f.away && (!LIVE || f.session));
+
+function openDenPanel(d) {
+  if (d.isCommons) return;
+  if (denPanel?.d === d) return renderDen();
+  denPanel = { d, tab: 'tasks', tasks: null, prs: null, source: '', known: true, canAssign: true, error: '' };
+  $('den-panel').hidden = false; $('fox-panel').hidden = true;
+  loadDen(); renderDen();
+}
+function closeDenPanel() { denPanel = null; $('den-panel').hidden = true; $('fox-panel').hidden = false; }
+async function loadDen() {
+  const p = denPanel; if (!p) return;
+  p.tasks = null; p.prs = null; p.error = ''; renderDen();
+  if (!LIVE) {
+    p.tasks = (DEMO_TASKS[p.d.repo] || []).map(t => ({ ...t, source: 'demo' })); p.source = 'demo'; p.prs = { available: true, prs: DEMO_PRS[p.d.repo] || [] };
+  } else {
+    const q = '?repo=' + encodeURIComponent(p.d.repo);
+    const [t, r] = await Promise.allSettled([api('/api/tasks' + q), api('/api/prs' + q)]);
+    if (denPanel !== p) return;
+    if (t.status === 'fulfilled') {
+      p.tasks = t.value.tasks; p.source = t.value.source; p.known = t.value.known; p.canAssign = t.value.canAssign;
+      t.value.tasks.forEach(x => x.assignment && assignments.set(taskKey(p.d.repo, x.id), { id: x.assignment.id, state: x.assignment.state, session: x.assignment.session, fox: foxBySession(x.assignment.session)?.name }));
+    } else { p.tasks = []; p.error = t.reason.message; }
+    p.prs = r.status === 'fulfilled' ? r.value : { available: false, reason: r.reason.message };
+  }
+  renderDen();
+}
+
+function renderDen() {
+  const p = denPanel; if (!p) return;
+  $('den-name').textContent = p.d.name;
+  $('den-swatch').style.background = p.d.rug[1];
+  $('den-source').textContent = p.source === 'tasks-md' ? 'TASKS.md' : p.source === 'demo' ? 'sample data' : p.source === 'none' ? 'no TASKS.md' : '…';
+  document.querySelectorAll('#den-tabs button').forEach(b => b.setAttribute('aria-selected', String(b.dataset.tab === p.tab)));
+  const list = $('den-list'); list.replaceChildren();
+  if (p.tab === 'tasks') renderTasks(list, p); else renderPrs(list, p);
+}
+function renderTasks(list, p) {
+  if (p.tasks === null) return list.append(mk('p', 'den-note', 'Loading…'));
+  if (p.error) list.append(mk('p', 'den-note err', p.error));
+  if (!p.tasks.length) {
+    list.append(mk('p', 'den-note', p.known ? 'No TASKS.md in this repo yet.' : 'Start a session in this repo so the den can find its TASKS.md.'));
+    const tpl = mk('pre', 'den-tpl', '## Ready\n- [ ] Fix the login bug #bug ~S\n  Optional detail, indented.\n\n## Doing\n\n## Done');
+    return list.append(tpl);
+  }
+  for (const [label, status] of [['Ready', 'open'], ['Doing', 'doing'], ['Done', 'done']]) {
+    const group = p.tasks.filter(t => t.status === status); if (!group.length) continue;
+    const box = status === 'done' ? mk('details', 'den-group') : mk('div', 'den-group');
+    const head = mk(status === 'done' ? 'summary' : 'h3', null, `${label} · ${group.length}`); box.append(head);
+    group.forEach(t => box.append(taskCard(p, t)));
+    list.append(box);
+  }
+}
+function taskCard(p, t) {
+  const a = assignments.get(taskKey(p.d.repo, t.id)), live = a && a.state !== 'cancelled';
+  const card = mk('div', 'task' + (t.status === 'done' ? ' done' : '')); card.tabIndex = 0; card.dataset.id = t.id;
+  card.append(mk('div', 'task-title', t.title));
+  const meta = mk('div', 'task-meta');
+  (t.labels || []).forEach(l => meta.append(mk('span', 'tag', '#' + l)));
+  if (t.size) meta.append(mk('span', 'tag', t.size));
+  if (live) meta.append(mk('span', 'tag assigned', `${a.fox || 'a fox'} · ${a.state === 'queued' ? 'queued' : 'working'}`));
+  card.append(meta);
+  if (t.status !== 'done' && p.canAssign) {
+    const row = mk('div', 'task-actions');
+    if (live && a.state === 'queued') {
+      const cancel = mk('button', 'mini', 'Cancel'); cancel.type = 'button'; cancel.addEventListener('click', () => cancelAssign(p, t)); row.append(cancel);
+    } else if (!live) {
+      const sel = mk('select', 'mini'); sel.setAttribute('aria-label', `Assign "${t.title}" to…`);
+      sel.append(new Option('Assign to…', ''));
+      eligible(p.d).forEach(f => sel.append(new Option(f.name, f.name)));
+      sel.addEventListener('change', () => { const f = eligible(p.d).find(x => x.name === sel.value); sel.value = ''; if (f) askAssign(t, f); });
+      row.append(sel);
+    }
+    card.append(row);
+    if (!live) card.addEventListener('pointerdown', e => startDrag(e, card, p, t));
+  }
+  return card;
+}
+function renderPrs(list, p) {
+  if (!p.prs) return list.append(mk('p', 'den-note', 'Loading…'));
+  if (!p.prs.available) return list.append(mk('p', 'den-note', p.prs.reason));
+  if (!p.prs.prs.length) return list.append(mk('p', 'den-note', 'No open pull requests.'));
+  for (const pr of p.prs.prs) {
+    const row = mk('button', 'pr'); row.type = 'button';
+    const top = mk('div', 'pr-top'); top.append(mk('span', 'pr-num', '#' + pr.number), mk('span', 'pr-title', pr.title)); row.append(top);
+    const meta = mk('div', 'task-meta');
+    meta.append(mk('span', 'tag', '⎇ ' + pr.branch), mk('span', 'tag', pr.author));
+    if (pr.draft) meta.append(mk('span', 'tag', 'draft'));
+    if (pr.review) meta.append(mk('span', 'tag', pr.review.toLowerCase().replace(/_/g, ' ')));
+    meta.append(mk('span', 'tag chk-' + pr.checks, pr.checks === 'none' ? 'no checks' : 'checks ' + pr.checks));
+    row.append(meta);
+    // a pull request's branch is a corner of the den: fly there
+    row.addEventListener('click', () => { const b = p.d.branches.find(x => x.name === pr.branch); if (b) { visitBranch(p.d, b); } else if (pr.url) window.open(pr.url, '_blank', 'noopener'); });
+    list.append(row);
+  }
+}
+
+/* drag a task card onto a fox */
+const foxAtPoint = (cx, cy, foxes) => {
+  const r = cv.getBoundingClientRect(); if (cx < r.left || cx > r.right || cy < r.top || cy > r.bottom) return null;
+  const [wx, wy] = toWorld(cx - r.left, cy - r.top); let best = null, bd = 34;
+  foxes.forEach(f => { const [sx, sy] = wpos(f), dd = Math.hypot(wx - sx, wy - (sy - 16)); if (dd < bd) { bd = dd; best = f; } });
+  return best;
+};
+function startDrag(e, card, p, t) {
+  if (e.button !== 0 || e.target.closest('button, select')) return;
+  const x0 = e.clientX, y0 = e.clientY; let ghost = null;
+  try { card.setPointerCapture(e.pointerId); } catch { /* the drag still works through the card's own events */ }
+  const move = ev => {
+    if (!ghost && Math.hypot(ev.clientX - x0, ev.clientY - y0) < 5) return;
+    if (!ghost) {
+      ghost = card.cloneNode(true); ghost.className = 'task ghost'; document.body.append(ghost);
+      const foxes = eligible(p.d); dragTask = { task: t, valid: new Set(foxes), hover: null };
+      followFloor = false;
+    }
+    ghost.style.transform = `translate(${ev.clientX + 12}px, ${ev.clientY + 12}px) rotate(3deg)`;
+    dragTask.hover = foxAtPoint(ev.clientX, ev.clientY, [...dragTask.valid]);
+    ghost.dataset.over = dragTask.hover ? dragTask.hover.name : '';
+  };
+  const end = ev => {
+    card.removeEventListener('pointermove', move); card.removeEventListener('pointerup', end); card.removeEventListener('pointercancel', end);
+    document.removeEventListener('keydown', esc);
+    const hover = ev.type === 'pointerup' && ghost ? dragTask.hover : null;
+    ghost?.remove(); dragTask = null;
+    if (hover) askAssign(t, hover);
+  };
+  const esc = k => { if (k.key === 'Escape') end({ type: 'cancel' }); };
+  card.addEventListener('pointermove', move); card.addEventListener('pointerup', end); card.addEventListener('pointercancel', end);
+  document.addEventListener('keydown', esc);
+}
+function drawDropRings() {
+  if (!dragTask) return;
+  const pulse = 1 + 0.08 * Math.sin(performance.now() / 160);
+  dragTask.valid.forEach(f => {
+    const [sx, sy] = wpos(f), hot = dragTask.hover === f;
+    ctx.lineWidth = hot ? 3 : 2; ctx.strokeStyle = hot ? '#ffd77e' : 'rgba(255,215,126,.55)';
+    ctx.beginPath(); ctx.ellipse(sx, sy, (hot ? 28 : 23) * pulse, (hot ? 13 : 10.5) * pulse, 0, 0, TAU); ctx.stroke();
+  });
+}
+
+/* confirm, hand over, and what comes back */
+function askAssign(task, fox) {
+  const idle = fox.state === 'sleeping';
+  pendingDrop = { task, fox };
+  $('confirm-title').textContent = `Hand "${task.title}" to ${fox.name}?`;
+  $('confirm-text').textContent = task.detail ? `${task.title}\n${task.detail}` : task.title;
+  $('confirm-when').textContent = idle ? `${fox.name} is idle: it picks this up the next time you message it.` : `${fox.name} gets this when it finishes its current turn.`;
+  $('confirm').hidden = false; $('confirm-ok').focus();
+}
+function closeConfirm() { pendingDrop = null; $('confirm').hidden = true; }
+async function commitAssign() {
+  const { task, fox } = pendingDrop; const p = denPanel; closeConfirm();
+  try {
+    let a;
+    if (LIVE) a = await api('/api/assign', { method: 'POST', body: JSON.stringify({ repo: fox.den.repo, taskId: task.id, sessionId: fox.session }) });
+    else a = { id: 'a_demo' + task.id, state: 'queued' };
+    assignments.set(taskKey(fox.den.repo, task.id), { id: a.id, state: 'queued', session: fox.session, fox: fox.name });
+    fox.scroll = 1.5; fox.hopAt = performance.now() / 1000; burst(fox, 'confetti', 12);
+    toast(`Queued for ${fox.name}`, task.title);
+    // the demo has no hooks, so a demo fox picks the task up a few seconds later
+    if (!LIVE) setTimeout(() => applyAssign({ ...a, repo: fox.den.repo, taskId: task.id, state: 'delivered', session: fox.session }), 3500);
+  } catch (err) { toast('Could not hand it over', err.message); }
+  if (denPanel === p) renderDen();
+}
+async function cancelAssign(p, t) {
+  const a = assignments.get(taskKey(p.d.repo, t.id)); if (!a) return;
+  try { if (LIVE) await api('/api/assign/' + a.id, { method: 'DELETE' }); assignments.delete(taskKey(p.d.repo, t.id)); }
+  catch (err) { toast('Could not cancel', err.message); }
+  renderDen();
+}
+// a hook handed the task over (live), or the demo's timer did
+function applyAssign(a) {
+  const prev = assignments.get(taskKey(a.repo, a.taskId)), fox = foxBySession(a.session);
+  if (a.state === 'cancelled') assignments.delete(taskKey(a.repo, a.taskId));
+  else assignments.set(taskKey(a.repo, a.taskId), { id: a.id, state: a.state, session: a.session, fox: prev?.fox || fox?.name });
+  if (a.state === 'delivered' && prev?.state !== 'delivered' && fox) {
+    toast(`${fox.name} picked it up`, 'It is on the task now.');
+    const t = denPanel?.tasks?.find(x => x.id === a.taskId); if (t) t.status = 'doing';
+  }
+  if (denPanel) renderDen();
+}
+$('den-close').addEventListener('click', closeDenPanel);
+$('den-refresh').addEventListener('click', () => loadDen());
+document.querySelectorAll('#den-tabs button').forEach(b => b.addEventListener('click', () => { if (denPanel) { denPanel.tab = b.dataset.tab; renderDen(); } }));
+$('confirm-ok').addEventListener('click', commitAssign);
+$('confirm-no').addEventListener('click', closeConfirm);
+$('confirm').addEventListener('keydown', e => { if (e.key === 'Escape') closeConfirm(); });
+
 /* ---------- loop ---------- */
 resize(); overview(true);
-select(DENS[0].foxes[0]);
-let last = performance.now(), uiAcc = 0;
+if (LIVE) startLive(); else { setConn('Demo', true); select(DENS[0].foxes[0]); }
+let last = performance.now(), uiAcc = 0, lastDraw = 0;
+const IDLE_FRAME_MS = 32; // frame gap when the view is still
 function frame(now) {
   const raw = Math.min(0.05, (now - last) / 1000); last = now;
   const dt = paused ? 0 : raw * speed;
   simT += dt; tick(dt);
-  if (scr.w > 1) render(simT);
+  // nothing moves the view or opens a room: 30 fps is plenty, and the tab stays cool all day
+  const settled = !drag && Math.abs(cam.x - camT.x) < 0.5 && Math.abs(cam.y - camT.y) < 0.5 && Math.abs(cam.z - camT.z) < 0.002 && DENS.every(d => d.t === 0 || d.t === 1);
+  if (scr.w > 1 && (!settled || now - lastDraw >= IDLE_FRAME_MS)) { render(simT); lastDraw = now; }
   uiAcc += raw; if (uiAcc > 0.25) { uiAcc = 0; renderUi(); }
   requestAnimationFrame(frame);
 }
