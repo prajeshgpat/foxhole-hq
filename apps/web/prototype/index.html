@@ -4,6 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Foxhole HQ Den</title>
+<meta name="foxhole-token" content="">
 <meta name="claude:viewport-fit-sides" content="cover">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -95,6 +96,47 @@ header { display: flex; flex-wrap: wrap; gap: 12px 20px; align-items: center; ju
 .toast b { display: block; color: var(--alert); font-weight: 600; }
 @keyframes toastIn { from { transform: translateY(6px); opacity: 0.4; } to { transform: none; opacity: 1; } }
 
+.den-panel { display: grid; gap: 10px; }
+.den-head { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.den-head strong { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; font-size: 14px; }
+.den-head .swatch { width: 10px; height: 10px; border-radius: 3px; flex: none; }
+.chip-src { font: 600 10px var(--mono); color: var(--muted); border: 1px solid var(--line); border-radius: 6px; padding: 2px 6px; white-space: nowrap; }
+.mini { font-size: 12px; padding: 3px 8px; border-radius: 7px; border: 1px solid var(--line); background: var(--raise); color: var(--fg); }
+.mini:hover { border-color: var(--line-hi); }
+.den-tabs { display: flex; gap: 4px; border-bottom: 1px solid var(--line); }
+.den-tabs button { padding: 6px 10px; font-size: 12px; font-weight: 600; color: var(--muted); border-bottom: 2px solid transparent; }
+.den-tabs button[aria-selected="true"] { color: var(--fg); border-bottom-color: var(--fox); }
+.den-list { display: grid; gap: 8px; max-height: 60vh; overflow: auto; }
+.den-group { display: grid; gap: 6px; }
+.den-group h3, .den-group summary { margin: 4px 0 0; font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); cursor: default; }
+.den-note { margin: 0; font-size: 12px; color: var(--muted); overflow-wrap: anywhere; }
+.den-note.err { color: var(--err); }
+.den-tpl { margin: 0; padding: 8px; border-radius: 8px; background: var(--raise); font: 11px var(--mono); white-space: pre-wrap; }
+.den-hint { margin: 0; font-size: 11px; color: var(--muted); }
+.task, .pr { display: grid; gap: 6px; text-align: left; padding: 9px 10px; border-radius: 10px; background: var(--raise); border: 1px solid var(--line); touch-action: none; }
+.task:not(.done) { cursor: grab; }
+.task.done { opacity: 0.6; }
+.task:focus-visible, .pr:focus-visible { outline: 2px solid var(--fox); outline-offset: 1px; }
+.pr { touch-action: auto; cursor: pointer; }
+.pr:hover { border-color: var(--line-hi); }
+.task-title { font-size: 13px; font-weight: 600; overflow-wrap: anywhere; }
+.task-meta { display: flex; flex-wrap: wrap; gap: 4px; }
+.tag { font: 600 10px var(--mono); padding: 2px 6px; border-radius: 6px; background: rgba(255, 255, 255, 0.06); color: var(--muted); }
+.tag.assigned { background: rgba(255, 183, 77, 0.18); color: var(--fox); }
+.tag.chk-pass { color: var(--ok); } .tag.chk-fail { color: var(--err); } .tag.chk-pending { color: var(--alert); }
+.pr-top { display: flex; gap: 8px; min-width: 0; font-size: 13px; }
+.pr-num { font-family: var(--mono); color: var(--muted); flex: none; }
+.pr-title { overflow-wrap: anywhere; font-weight: 600; }
+.task-actions select { max-width: 100%; }
+.task.ghost { position: fixed; left: 0; top: 0; z-index: 30; width: 260px; pointer-events: none; box-shadow: 0 14px 34px rgba(0, 0, 0, 0.5); cursor: grabbing; }
+.task.ghost[data-over]:not([data-over=""])::after { content: "Drop on " attr(data-over); font-size: 11px; color: var(--alert); font-weight: 600; }
+.confirm { position: fixed; inset: 0; z-index: 40; display: grid; place-items: center; background: rgba(5, 9, 8, 0.6); padding: 16px; }
+.confirm[hidden] { display: none; }
+.confirm-box { width: min(420px, 100%); background: var(--surface); border: 1px solid var(--line-hi); border-radius: 14px; padding: 16px; display: grid; gap: 10px; }
+.confirm-box h3 { margin: 0; font-size: 15px; }
+.confirm-box pre { margin: 0; padding: 10px; border-radius: 8px; background: var(--raise); font: 12px var(--mono); white-space: pre-wrap; overflow-wrap: anywhere; max-height: 40vh; overflow: auto; }
+.confirm-box p { margin: 0; font-size: 12px; color: var(--muted); }
+.confirm-actions { display: flex; justify-content: flex-end; gap: 8px; }
 .rail { display: grid; gap: 14px; min-width: 0; }
 .panel { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px; min-width: 0; }
 .panel h2, .panel h3 { font-size: 11px; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted); margin: 0 0 10px; }
@@ -195,11 +237,18 @@ pre { margin: 0; padding: 10px; border-radius: 8px; background: #0d1412; border:
       <div class="hint" id="hint">Drag to walk around · scroll or pinch to zoom · click a department to visit it · [ ] or 0 fits every den</div>
     </div>
     <aside class="rail">
+      <section class="panel den-panel" id="den-panel" hidden aria-label="Den tasks and pull requests">
+        <div class="den-head"><span class="swatch" id="den-swatch"></span><strong id="den-name"></strong><span class="chip-src" id="den-source"></span>
+          <button type="button" class="mini" id="den-refresh" aria-label="Refresh">↻</button><button type="button" class="mini" id="den-close" aria-label="Close den panel">×</button></div>
+        <div class="den-tabs" id="den-tabs" role="tablist"><button type="button" role="tab" data-tab="tasks" aria-selected="true">Tasks</button><button type="button" role="tab" data-tab="prs" aria-selected="false">Pull requests</button></div>
+        <div class="den-list" id="den-list"></div>
+        <p class="den-hint">Drag a task onto a fox, or use Assign to…</p>
+      </section>
       <section class="panel">
         <h2>Departments</h2>
         <div class="depts" id="depts"></div>
       </section>
-      <section class="panel">
+      <section class="panel" id="fox-panel">
         <h2>Selected fox</h2>
         <div class="d-head"><span class="dot" id="d-dot"></span><strong id="d-name"></strong><span class="src" id="d-src"></span></div>
         <div class="d-quest" id="d-quest"></div>
@@ -223,6 +272,10 @@ pre { margin: 0; padding: 10px; border-radius: 8px; background: #0d1412; border:
   </section>
 </div>
 <div class="toasts" id="toasts"></div>
+<div class="confirm" id="confirm" role="dialog" aria-modal="true" aria-labelledby="confirm-title" hidden>
+  <div class="confirm-box"><h3 id="confirm-title"></h3><pre id="confirm-text"></pre><p id="confirm-when"></p>
+    <div class="confirm-actions"><button type="button" class="btn ghost" id="confirm-no">Cancel</button><button type="button" class="btn primary" id="confirm-ok">Assign</button></div></div>
+</div>
 
 <script>
 (() => {
@@ -892,7 +945,7 @@ function drawFrontEdges(d) {
 }
 // A faint glass wall along the open front of each den, drawn over its contents: it reads as a cut through the ground, so the
 // den is clearly underground. It is GLASS_ALPHA opaque and stands at least GLASS_MIN_H tall, or as high as the grass there.
-const GLASS_ALPHA = 0.1, GLASS_MIN_H = 44;
+const GLASS_ALPHA = 0.2, GLASS_MIN_H = 44;
 function drawGlassWalls(d) {
   const sides = [
     { len: d.h, nb: k => nextTo(d, d.w + 0.5, k + 0.5), p: k => [d.w, k], q: k => [d.w, k + 1] },
@@ -1302,6 +1355,7 @@ function render(t) {
   }
   OFF = [0, 0];
   [COMMONS, ...DENS].forEach(drawParts);
+  drawDropRings();
   drawSigns();
 }
 function drawDen(d, t) {
@@ -1398,7 +1452,7 @@ cv.addEventListener('keydown', e => {
 });
 function tap(px, py) {
   const sign = [...signs].reverse().find(s => px >= s.x && px <= s.x + s.w && py >= s.y && py <= s.y + s.h);
-  if (sign) { if (sign.b) visitBranch(sign.d, sign.b); else visit(sign.o); return; }
+  if (sign) { if (sign.b) visitBranch(sign.d, sign.b); else { visit(sign.o); openDenPanel(sign.o); } return; }
   const [wx, wy] = toWorld(px, py);
   let best = null, bd = 30;
   [COMMONS, ...openDens()].forEach(d => d.foxes.filter(f => !f.away).forEach(f => { const [sx, sy] = wpos(f), dd = Math.hypot(wx - sx, wy - (sy - 16)); if (dd < bd) { bd = dd; best = f; } }));
@@ -1409,7 +1463,7 @@ function tap(px, py) {
   if (cam.z < roomZ * 0.6) {
     // click anywhere on a department's floor to go there
     const room = [COMMONS, ...openDens()].find(o => { const v = (wy + o.z0) / (TH / 2), u = wx / (TW / 2), lx = (u + v) / 2 - o.ox, ly = (v - u) / 2 - o.oy; return lx >= 0 && lx <= o.w && ly >= 0 && ly <= o.h; });
-    if (room) visit(room);
+    if (room) { visit(room); openDenPanel(room); }
   }
 }
 document.getElementById('zoom-in').addEventListener('click', () => { followFloor = false; camT.z = clampZ(camT.z * ZOOM_STEP); });
@@ -1473,7 +1527,7 @@ function buildDepts() {
     wrap.innerHTML = '<button type="button" class="dept-top"><span class="dept-name"><span class="swatch"></span><span></span></span><span class="dept-state"></span></button><div class="branches"></div>';
     wrap.querySelector('.swatch').style.background = d.rug[1];
     wrap.querySelector('.dept-name span:last-child').textContent = d.name;
-    wrap.querySelector('.dept-top').addEventListener('click', () => visit(d));
+    wrap.querySelector('.dept-top').addEventListener('click', () => { visit(d); openDenPanel(d); });
     const bl = wrap.querySelector('.branches');
     d.branches.forEach(b => {
       const row = document.createElement('button'); row.type = 'button'; row.className = 'branch';
@@ -1489,6 +1543,7 @@ function buildDepts() {
 buildDepts();
 let lastTimelineKey = '';
 function select(f) {
+  if (denPanel) closeDenPanel();
   selected = f;
   $('d-dot').style.background = f.fur; $('d-name').textContent = f.name; $('d-src').textContent = `${f.source} · ${f.model} · ${f.den.name} · ⎇ ${f.branch}`;
   const last = f.events[f.events.length - 1];
@@ -2317,6 +2372,7 @@ function startLive() {
     let ev; try { ev = JSON.parse(m.data); } catch { return; }
     if (backlog) backlog.push(ev); else applyLive(ev, false);
   };
+  es.addEventListener('assign', m => { try { applyAssign(JSON.parse(m.data)); } catch { /* a malformed message is ignored */ } });
   es.addEventListener('ready', () => {
     const replay = backlog || []; backlog = null;
     replay.forEach(ev => applyLive(ev, true));
@@ -2332,6 +2388,237 @@ function renderHq() {
   const n = DENS.filter(d => d.open).length;
   if (LIVE) $('hq').textContent = `Your HQ · ${n} active department${n === 1 ? '' : 's'}`;
 }
+
+/* ---------- den panel: a repo's tasks and pull requests; drag a task onto a fox to hand it over ----------
+   Live, the tasks come from the repo's TASKS.md and the pull requests from `gh`, both through `foxhole serve`
+   (a per-run token on every call). In the demo the same panel runs on sample data. Dropping a task on a fox
+   always asks first: the text shown is exactly what the session is handed. */
+const TOKEN = document.querySelector('meta[name="foxhole-token"]')?.content || '';
+const DEMO_TASKS = {
+  'github.com/acme/web': [
+    { id: 't-auth-1', title: 'Fix session expiry clock skew', labels: ['bug'], size: 'S', status: 'open', detail: 'Tokens expire early when the server clock drifts. Add 30 s leeway and a test.' },
+    { id: 't-csp', title: 'Add CSP headers to the dashboard', labels: ['security'], size: 'M', status: 'open' },
+    { id: 't-react', title: 'Upgrade to React 19', labels: ['chore'], size: 'L', status: 'doing' },
+    { id: 't-jose', title: 'Upgrade jose to v6', labels: [], status: 'done' },
+  ],
+  'github.com/foxhole-hq/foxhole-hq': [
+    { id: 't-pair', title: 'Pair two agents on one branch', labels: ['feature'], size: 'M', status: 'open' },
+    { id: 't-stats', title: 'Add zustand stats store', labels: ['chore'], size: 'S', status: 'open' },
+  ],
+  'github.com/acme/billing-api': [
+    { id: 't-hook', title: 'Retry failed webhooks with backoff', labels: ['bug'], size: 'M', status: 'open', detail: 'Dead-letter after five tries.' },
+  ],
+};
+const DEMO_PRS = {
+  'github.com/acme/web': [
+    { number: 212, title: 'fix: expire sessions with leeway', author: 'ember', branch: 'fix/session-expiry', draft: false, review: 'APPROVED', checks: 'pass', url: '' },
+    { number: 214, title: 'feat: CSP headers', author: 'juniper', branch: 'feat/csp-headers', draft: true, review: null, checks: 'pending', url: '' },
+  ],
+  'github.com/foxhole-hq/foxhole-hq': [{ number: 31, title: 'feat: pairing', author: 'rusty', branch: 'feat/pairing', draft: false, review: 'REVIEW_REQUIRED', checks: 'fail', url: '' }],
+  'github.com/acme/billing-api': [],
+};
+const taskKey = (repo, id) => repo + '#' + id;
+const assignments = new Map(); // taskKey -> { id, state, session, fox }
+let denPanel = null;           // { d, tab, tasks, prs, source, known, canAssign, error }
+let dragTask = null;           // { task, valid: Set of foxes, hover } while a card is being dragged
+let pendingDrop = null;        // { task, fox } waiting on the confirm popover
+
+const mk = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; };
+async function api(path, init = {}) {
+  const res = await fetch(path, { ...init, headers: { 'X-Foxhole-Token': TOKEN, ...(init.body ? { 'Content-Type': 'application/json' } : {}) } });
+  const body = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(body.error || `HTTP ${res.status}`);
+  return body;
+}
+const foxBySession = s => DENS.flatMap(d => d.foxes).find(f => f.session === s && !f.isCub);
+// the foxes a task from this den may go to: its own den's, with a session to hand it to
+const eligible = d => d.foxes.filter(f => !f.isCub && !f.away && (!LIVE || f.session));
+
+function openDenPanel(d) {
+  if (d.isCommons) return;
+  if (denPanel?.d === d) return renderDen();
+  denPanel = { d, tab: 'tasks', tasks: null, prs: null, source: '', known: true, canAssign: true, error: '' };
+  $('den-panel').hidden = false; $('fox-panel').hidden = true;
+  loadDen(); renderDen();
+}
+function closeDenPanel() { denPanel = null; $('den-panel').hidden = true; $('fox-panel').hidden = false; }
+async function loadDen() {
+  const p = denPanel; if (!p) return;
+  p.tasks = null; p.prs = null; p.error = ''; renderDen();
+  if (!LIVE) {
+    p.tasks = (DEMO_TASKS[p.d.repo] || []).map(t => ({ ...t, source: 'demo' })); p.source = 'demo'; p.prs = { available: true, prs: DEMO_PRS[p.d.repo] || [] };
+  } else {
+    const q = '?repo=' + encodeURIComponent(p.d.repo);
+    const [t, r] = await Promise.allSettled([api('/api/tasks' + q), api('/api/prs' + q)]);
+    if (denPanel !== p) return;
+    if (t.status === 'fulfilled') {
+      p.tasks = t.value.tasks; p.source = t.value.source; p.known = t.value.known; p.canAssign = t.value.canAssign;
+      t.value.tasks.forEach(x => x.assignment && assignments.set(taskKey(p.d.repo, x.id), { id: x.assignment.id, state: x.assignment.state, session: x.assignment.session, fox: foxBySession(x.assignment.session)?.name }));
+    } else { p.tasks = []; p.error = t.reason.message; }
+    p.prs = r.status === 'fulfilled' ? r.value : { available: false, reason: r.reason.message };
+  }
+  renderDen();
+}
+
+function renderDen() {
+  const p = denPanel; if (!p) return;
+  $('den-name').textContent = p.d.name;
+  $('den-swatch').style.background = p.d.rug[1];
+  $('den-source').textContent = p.source === 'tasks-md' ? 'TASKS.md' : p.source === 'demo' ? 'sample data' : p.source === 'none' ? 'no TASKS.md' : '…';
+  document.querySelectorAll('#den-tabs button').forEach(b => b.setAttribute('aria-selected', String(b.dataset.tab === p.tab)));
+  const list = $('den-list'); list.replaceChildren();
+  if (p.tab === 'tasks') renderTasks(list, p); else renderPrs(list, p);
+}
+function renderTasks(list, p) {
+  if (p.tasks === null) return list.append(mk('p', 'den-note', 'Loading…'));
+  if (p.error) list.append(mk('p', 'den-note err', p.error));
+  if (!p.tasks.length) {
+    list.append(mk('p', 'den-note', p.known ? 'No TASKS.md in this repo yet.' : 'Start a session in this repo so the den can find its TASKS.md.'));
+    const tpl = mk('pre', 'den-tpl', '## Ready\n- [ ] Fix the login bug #bug ~S\n  Optional detail, indented.\n\n## Doing\n\n## Done');
+    return list.append(tpl);
+  }
+  for (const [label, status] of [['Ready', 'open'], ['Doing', 'doing'], ['Done', 'done']]) {
+    const group = p.tasks.filter(t => t.status === status); if (!group.length) continue;
+    const box = status === 'done' ? mk('details', 'den-group') : mk('div', 'den-group');
+    const head = mk(status === 'done' ? 'summary' : 'h3', null, `${label} · ${group.length}`); box.append(head);
+    group.forEach(t => box.append(taskCard(p, t)));
+    list.append(box);
+  }
+}
+function taskCard(p, t) {
+  const a = assignments.get(taskKey(p.d.repo, t.id)), live = a && a.state !== 'cancelled';
+  const card = mk('div', 'task' + (t.status === 'done' ? ' done' : '')); card.tabIndex = 0; card.dataset.id = t.id;
+  card.append(mk('div', 'task-title', t.title));
+  const meta = mk('div', 'task-meta');
+  (t.labels || []).forEach(l => meta.append(mk('span', 'tag', '#' + l)));
+  if (t.size) meta.append(mk('span', 'tag', t.size));
+  if (live) meta.append(mk('span', 'tag assigned', `${a.fox || 'a fox'} · ${a.state === 'queued' ? 'queued' : 'working'}`));
+  card.append(meta);
+  if (t.status !== 'done' && p.canAssign) {
+    const row = mk('div', 'task-actions');
+    if (live && a.state === 'queued') {
+      const cancel = mk('button', 'mini', 'Cancel'); cancel.type = 'button'; cancel.addEventListener('click', () => cancelAssign(p, t)); row.append(cancel);
+    } else if (!live) {
+      const sel = mk('select', 'mini'); sel.setAttribute('aria-label', `Assign "${t.title}" to…`);
+      sel.append(new Option('Assign to…', ''));
+      eligible(p.d).forEach(f => sel.append(new Option(f.name, f.name)));
+      sel.addEventListener('change', () => { const f = eligible(p.d).find(x => x.name === sel.value); sel.value = ''; if (f) askAssign(t, f); });
+      row.append(sel);
+    }
+    card.append(row);
+    if (!live) card.addEventListener('pointerdown', e => startDrag(e, card, p, t));
+  }
+  return card;
+}
+function renderPrs(list, p) {
+  if (!p.prs) return list.append(mk('p', 'den-note', 'Loading…'));
+  if (!p.prs.available) return list.append(mk('p', 'den-note', p.prs.reason));
+  if (!p.prs.prs.length) return list.append(mk('p', 'den-note', 'No open pull requests.'));
+  for (const pr of p.prs.prs) {
+    const row = mk('button', 'pr'); row.type = 'button';
+    const top = mk('div', 'pr-top'); top.append(mk('span', 'pr-num', '#' + pr.number), mk('span', 'pr-title', pr.title)); row.append(top);
+    const meta = mk('div', 'task-meta');
+    meta.append(mk('span', 'tag', '⎇ ' + pr.branch), mk('span', 'tag', pr.author));
+    if (pr.draft) meta.append(mk('span', 'tag', 'draft'));
+    if (pr.review) meta.append(mk('span', 'tag', pr.review.toLowerCase().replace(/_/g, ' ')));
+    meta.append(mk('span', 'tag chk-' + pr.checks, pr.checks === 'none' ? 'no checks' : 'checks ' + pr.checks));
+    row.append(meta);
+    // a pull request's branch is a corner of the den: fly there
+    row.addEventListener('click', () => { const b = p.d.branches.find(x => x.name === pr.branch); if (b) { visitBranch(p.d, b); } else if (pr.url) window.open(pr.url, '_blank', 'noopener'); });
+    list.append(row);
+  }
+}
+
+/* drag a task card onto a fox */
+const foxAtPoint = (cx, cy, foxes) => {
+  const r = cv.getBoundingClientRect(); if (cx < r.left || cx > r.right || cy < r.top || cy > r.bottom) return null;
+  const [wx, wy] = toWorld(cx - r.left, cy - r.top); let best = null, bd = 34;
+  foxes.forEach(f => { const [sx, sy] = wpos(f), dd = Math.hypot(wx - sx, wy - (sy - 16)); if (dd < bd) { bd = dd; best = f; } });
+  return best;
+};
+function startDrag(e, card, p, t) {
+  if (e.button !== 0 || e.target.closest('button, select')) return;
+  const x0 = e.clientX, y0 = e.clientY; let ghost = null;
+  try { card.setPointerCapture(e.pointerId); } catch { /* the drag still works through the card's own events */ }
+  const move = ev => {
+    if (!ghost && Math.hypot(ev.clientX - x0, ev.clientY - y0) < 5) return;
+    if (!ghost) {
+      ghost = card.cloneNode(true); ghost.className = 'task ghost'; document.body.append(ghost);
+      const foxes = eligible(p.d); dragTask = { task: t, valid: new Set(foxes), hover: null };
+      followFloor = false;
+    }
+    ghost.style.transform = `translate(${ev.clientX + 12}px, ${ev.clientY + 12}px) rotate(3deg)`;
+    dragTask.hover = foxAtPoint(ev.clientX, ev.clientY, [...dragTask.valid]);
+    ghost.dataset.over = dragTask.hover ? dragTask.hover.name : '';
+  };
+  const end = ev => {
+    card.removeEventListener('pointermove', move); card.removeEventListener('pointerup', end); card.removeEventListener('pointercancel', end);
+    document.removeEventListener('keydown', esc);
+    const hover = ev.type === 'pointerup' && ghost ? dragTask.hover : null;
+    ghost?.remove(); dragTask = null;
+    if (hover) askAssign(t, hover);
+  };
+  const esc = k => { if (k.key === 'Escape') end({ type: 'cancel' }); };
+  card.addEventListener('pointermove', move); card.addEventListener('pointerup', end); card.addEventListener('pointercancel', end);
+  document.addEventListener('keydown', esc);
+}
+function drawDropRings() {
+  if (!dragTask) return;
+  const pulse = 1 + 0.08 * Math.sin(performance.now() / 160);
+  dragTask.valid.forEach(f => {
+    const [sx, sy] = wpos(f), hot = dragTask.hover === f;
+    ctx.lineWidth = hot ? 3 : 2; ctx.strokeStyle = hot ? '#ffd77e' : 'rgba(255,215,126,.55)';
+    ctx.beginPath(); ctx.ellipse(sx, sy, (hot ? 28 : 23) * pulse, (hot ? 13 : 10.5) * pulse, 0, 0, TAU); ctx.stroke();
+  });
+}
+
+/* confirm, hand over, and what comes back */
+function askAssign(task, fox) {
+  const idle = fox.state === 'sleeping';
+  pendingDrop = { task, fox };
+  $('confirm-title').textContent = `Hand "${task.title}" to ${fox.name}?`;
+  $('confirm-text').textContent = task.detail ? `${task.title}\n${task.detail}` : task.title;
+  $('confirm-when').textContent = idle ? `${fox.name} is idle: it picks this up the next time you message it.` : `${fox.name} gets this when it finishes its current turn.`;
+  $('confirm').hidden = false; $('confirm-ok').focus();
+}
+function closeConfirm() { pendingDrop = null; $('confirm').hidden = true; }
+async function commitAssign() {
+  const { task, fox } = pendingDrop; const p = denPanel; closeConfirm();
+  try {
+    let a;
+    if (LIVE) a = await api('/api/assign', { method: 'POST', body: JSON.stringify({ repo: fox.den.repo, taskId: task.id, sessionId: fox.session }) });
+    else a = { id: 'a_demo' + task.id, state: 'queued' };
+    assignments.set(taskKey(fox.den.repo, task.id), { id: a.id, state: 'queued', session: fox.session, fox: fox.name });
+    fox.scroll = 1.5; fox.hopAt = performance.now() / 1000; burst(fox, 'confetti', 12);
+    toast(`Queued for ${fox.name}`, task.title);
+    // the demo has no hooks, so a demo fox picks the task up a few seconds later
+    if (!LIVE) setTimeout(() => applyAssign({ ...a, repo: fox.den.repo, taskId: task.id, state: 'delivered', session: fox.session }), 3500);
+  } catch (err) { toast('Could not hand it over', err.message); }
+  if (denPanel === p) renderDen();
+}
+async function cancelAssign(p, t) {
+  const a = assignments.get(taskKey(p.d.repo, t.id)); if (!a) return;
+  try { if (LIVE) await api('/api/assign/' + a.id, { method: 'DELETE' }); assignments.delete(taskKey(p.d.repo, t.id)); }
+  catch (err) { toast('Could not cancel', err.message); }
+  renderDen();
+}
+// a hook handed the task over (live), or the demo's timer did
+function applyAssign(a) {
+  const prev = assignments.get(taskKey(a.repo, a.taskId)), fox = foxBySession(a.session);
+  if (a.state === 'cancelled') assignments.delete(taskKey(a.repo, a.taskId));
+  else assignments.set(taskKey(a.repo, a.taskId), { id: a.id, state: a.state, session: a.session, fox: prev?.fox || fox?.name });
+  if (a.state === 'delivered' && prev?.state !== 'delivered' && fox) {
+    toast(`${fox.name} picked it up`, 'It is on the task now.');
+    const t = denPanel?.tasks?.find(x => x.id === a.taskId); if (t) t.status = 'doing';
+  }
+  if (denPanel) renderDen();
+}
+$('den-close').addEventListener('click', closeDenPanel);
+$('den-refresh').addEventListener('click', () => loadDen());
+document.querySelectorAll('#den-tabs button').forEach(b => b.addEventListener('click', () => { if (denPanel) { denPanel.tab = b.dataset.tab; renderDen(); } }));
+$('confirm-ok').addEventListener('click', commitAssign);
+$('confirm-no').addEventListener('click', closeConfirm);
+$('confirm').addEventListener('keydown', e => { if (e.key === 'Escape') closeConfirm(); });
 
 /* ---------- loop ---------- */
 resize(); overview(true);
