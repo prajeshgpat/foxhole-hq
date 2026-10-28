@@ -2,7 +2,7 @@
 
 > See your agents work, know when they need you, and watch them level up.
 
-Foxhole HQ is a plugin + website that turns AI coding agents (Claude Code, Codex, and others) into animated foxes living in 3D isometric dens on one shared HQ floor: one den per repo, one corner per branch. Each fox shows what its agent is doing in real time, raises a paw when it needs you, earns XP for verified work, and competes on a global leaderboard that rewards **impact per token** — efficient agents rank highest.
+Foxhole HQ is a plugin + website that turns AI coding agents (Claude Code, Codex, and others) into animated foxes living in isometric dens dug into one shared hillside: one den per repo, one corner per branch. Each fox shows what its agent is doing in real time, raises a paw when it needs you, earns XP for verified work, and competes on a global leaderboard that rewards **impact per token** — efficient agents rank highest.
 
 ---
 
@@ -69,13 +69,13 @@ Foxhole HQ is a plugin + website that turns AI coding agents (Claude Code, Codex
  └────────────────────────────────┬───────────────┘
                                   │ WebSocket
                                   ▼
-            Website (React + React Three Fiber)
-            3D isometric den · HUD · stats · ladder
+            Website (canvas den page; React app shell later)
+            isometric den · HUD · stats · ladder
 ```
 
 **Key principle:** the **den** is the persistent object. Each repo gets its own den, owned by the user's account (or team). Sessions come and go inside it. The website connects to dens, never to a single session — so they stay live after any agent session ends.
 
-An account's dens sit side by side on one **HQ floor**: a single explorable 3D space where every den is a department, so you can see every repo at work at a glance and move between them without switching views. Inside a den, each **branch** gets its own corner. The HQ floor is a thin aggregate that subscribes to a small summary feed from each den (awake/asleep counts, who needs you, current quest per branch), not to every event.
+An account's dens sit side by side on one **HQ floor**: a single explorable isometric hillside where every den is a department, so you can see every repo at work at a glance and move between them without switching views. Inside a den, each **branch** gets its own corner. The HQ floor is a thin aggregate that subscribes to a small summary feed from each den (awake/asleep counts, who needs you, current quest per branch), not to every event.
 
 ---
 
@@ -99,12 +99,13 @@ An account's dens sit side by side on one **HQ floor**: a single explorable 3D s
 
 ### Frontend
 
-- **React + Vite + TypeScript**
-- **React Three Fiber + drei** — 3D scene, orthographic isometric camera, map controls, HTML labels.
-- **Zustand** — fox state store driven by WebSocket events.
-- **Tailwind** — HUD, panels, dashboards.
-- **Assets** — CC0 low-poly packs (Quaternius animated animals incl. fox; Kenney furniture/room kits), glTF with animation clips.
-- **Pathfinding** — tile grid + A*.
+- **Canvas 2D renderer, no dependencies** — the prototype page, served by `foxhole serve`.
+- **React + Vite + TypeScript** — the hosted app shell (HUD, stats, ladder), wrapping the canvas.
+- **Zustand** — fox state store later.
+- **Tailwind** — panels, dashboards.
+- **Assets** — sprites drawn in code (pixel grids); no glTF yet.
+- **Pathfinding** — breadth-first search over each den's tile grid.
+- WebGL / React Three Fiber only if the criteria in §7 trigger.
 
 ### Hosting (free tier to start)
 
@@ -191,47 +192,57 @@ All adapters normalize into one schema:
 
 ---
 
-## 7. The 3D isometric world
+## 7. The isometric world
 
 ### Rendering
 
-- Three.js via React Three Fiber, **orthographic camera** at the classic isometric angle (rotate in 90° steps, zoom, pan).
-- Soft directional light + shadows, warm lamps.
-- Low-poly / voxel aesthetic, cozy den interior.
+- **Plain Canvas 2D, no WebGL and no dependencies.** The den is one page (`apps/web/prototype/index.html`) that loads instantly and runs all day on a laptop.
+- **Fixed 2:1 isometric projection** (tiles 64×32 px, heights in px). The camera has one viewing angle and does not rotate: the hillside, back walls and holes are drawn for that angle.
+- **Painter's order:** lawn → rooms back to front → glass fronts → outdoor scenery → fox labels → particles → floating signs.
+- **Look:** flat-shaded polygons with a few tones per surface, pixel-art foxes drawn from character grids, a night palette, warm lantern glows (additive blending), no real-time shadows.
+- **Decision: keep the canvas renderer for now.** Revisit WebGL (e.g. React Three Fiber) only if the performance work below cannot hold 60 fps with ~20 open dens on a mid-range laptop, free camera rotation becomes a must, or we move to 3D assets. The world model (grid, rooms, foxes, events) is renderer-independent, so a later port keeps it.
 
-### The HQ floor, dens, and branch corners
+### The HQ floor and dens
 
-- **One HQ floor.** All your dens sit on one continuous isometric floor, like departments in an office, linked by corridors and a shared **Commons** (trophy cabinet, a status board with a light per fox, couches). The default view shows the whole floor at once, so every den is visible without zooming in.
-- **Move around freely.** Drag to pan, scroll or pinch to zoom, arrow keys when focused. Clicking a den's sign, its floor, a fox, or a "needs you" alert flies the camera there; "Whole floor" zooms back out.
-- **One den per repo.** Each den is its own department room, with a floating sign showing the repo name (or its alias) and its status, which turns gold when a fox there needs you. Each den has its own foxes, quest board, and history.
-- **A corner per branch.** Inside a den, each branch gets a corner with a rug in its own colour, a floor tag (`⎇ feat/csp-headers`), and desks for the agents on that branch. Agents on the same branch share the corner; a new branch adds a new corner. Shared stations (bookshelf, server rack, window, burrow, beds, quest board) belong to the whole den.
-- **Desks.** Every agent gets its own desk in its branch's corner, assigned the first time it joins and kept for good, with a nameplate and mug in its colour.
-- Quiet dens dim to their night state; alerts and approvals always carry the repo and branch, so you know what is asking before you go there.
+- **A hillside.** The lawn slopes gently down toward the viewer; every room is dug into it.
+- **The Commons and a pyramid of dens.** Rooms tile one rectangle of 13×11-tile cells. The Commons takes the back corner; each repo's den takes the next cell in a fixed order (1, 3, 2, 4, 7, 5, 6, 8, then the pattern repeats) that grows the grid a row, then a column, alternating: 1×1, 2×1, 2×2, 3×2, 3×3, 4×3, … up to 6×6 (35 dens). Foxes from later repos wait in the Commons.
+- **Always a full rectangle.** A cell no den has taken yet is absorbed by the room to its left, which simply runs wider. When that den opens it takes its cell back.
+- **Floors step down.** Each ring of cells (same distance from the back corner) sits one step lower than the ring behind it, so the Commons is the top of the pyramid.
+- **Walls and edges.**
+  - Only the back sides of the grid (top and left) have earth retaining walls that follow the grass, dressed with stones, roots and timber posts.
+  - Between rooms there is a retaining face down to a lower neighbour, or a low divider with a two-tile gap beside a neighbour on the same level.
+  - Open front edges show the floor slab and a faint (10% opaque) glass wall, so you can see the den is underground.
+- **Ways in.** A top-row den has a hole in its back wall under a hole in the grass; a left-column den uses its left wall; an inner den has a hatch in its floor, linked by a tunnel to a grass hole on the lawn behind the grid. Foxes climb down shafts and vanish into holes.
+- **Opening and closing.** A den is dug open (the pit mouth widens, the hole deepens, dust and clods fly on landing) when one of its foxes wakes, unless its cell is already floor, in which case it just takes the cell over. It fills back in after 5 minutes with every fox asleep. Rooms close only last-in-first-out, so the grid stays a rectangle.
+- **Moving around.** Drag to pan (edges rubber-band), scroll or pinch to zoom, arrow keys and +/− when focused. Clicking a den's sign, its floor or a fox flies the camera there. The **[ ] fit button** (or `0`) centres every den and zooms one step closer than a tight fit, and keeps them framed as rooms open and close until you move the camera; one zoom-out step shows every den whole.
+- **Signs and corners.** Each den has a floating sign (repo name or alias, status, gold when a fox needs you). Each branch gets a rug corner (up to four per den) in its own colour with a floor tag (`⎇ feat/csp-headers`) that steps aside to avoid overlaps, and desks for the agents on that branch.
+- **The Commons.** A lounge with a bar and stools, arcade cabinets, a TV with a console, a pong table, a couch and a reading nook. Resident foxes live there. A session that goes quiet sends its fox up its den's hole, across the lawn and down into the Commons; it walks back when the session wakes.
+- **Outdoors.** A river with a bridge down the left of the grid, trees, bushes, flowers, rocks and wildlife.
 
 ### Stations
 
-- **Shared by the whole den, around the walls:** bookshelf · server rack · window/telescope · burrow (subagents) · beds · quest board (task list).
-- **In each branch corner:** that branch's desks.
-- **In the Commons:** trophy cabinet (achievements) · status board for every den.
+- **Per den:** bookshelf (Read/Grep/Glob) · server rack (Bash) · window, with a telescope on back-wall dens (web search and fetch) · burrow at the hole (Task: subagent cubs pop out) · beds · quest board · plant.
+- **Per branch corner:** that branch's desks, with glowing monitors while a fox types.
+- **In the Commons:** hangout spots. Still to come: trophy cabinet (achievements) and a status board for every den.
 
 ### Fox behavior
 
-- Each fox runs a **state machine**: `idle → walking → working(tool) → waiting → celebrating → sleeping`.
-- **Event queue per fox**: animations finish their walk before the next action, so rapid hook events never cause flicker.
-- A* pathfinding over the tile grid.
-- Floating HTML label above each fox: name, current task, status pill.
+- **States:** idle, walking, working (at the tool's station), waiting (paw up, light beam), celebrating, stumbling (error, puff of smoke), sleeping (drifting z's), plus climbing and diving for the holes.
+- **Movement:** foxes walk tile paths (breadth-first search over each den's grid, stations blocked) and routes across the lawn for trips to the Commons.
+- **Live mode:** one fox per Claude Code session, fed by Server-Sent Events from `foxhole serve`; subagents are cubs; on load the backlog is replayed so everyone is already in place.
+- **Demo mode:** scripted quests per den.
+- **Labels:** drawn on the canvas above each fox (name, current target, status pill), stacked so they don't overlap, shown when zoomed in.
 
 ### Juice
 
-- Day/night cycle tied to local time.
-- Floating XP numbers, confetti on quest completion, achievement toasts.
-- Click a fox → camera eases in, side panel shows its task, timeline, tokens.
-- Unlockable decor as you level up (plants, rugs, lamps, bigger den, seasonal items).
+- Rooms dug open with dust and flying clods; confetti and floating +XP on a finished quest; tap a fox and it hops and spins, and the side panel shows its task, timeline, tokens and cost; toasts for level-ups and arrivals.
+- Later: day/night tied to local time, achievement toasts, unlockable decor (plants, rugs, lamps, seasonal items), and a den panel with tasks and pull requests (see §11, Phase 1.5).
 
 ### Performance (runs all day)
 
-- Cap device pixel ratio, instanced props, pause render loop when the tab is hidden, low-power mode toggle.
-- Lightweight 2D fallback view for low-end devices / mobile.
+- **Done:** device pixel ratio capped at 2; grass, flowers, rocks, trees and wildlife drawn only for tiles on screen; grass tufts, flowers and floor tiles batched into single fills; room neighbours looked up once per frame; label stacking capped per frame; side panel refreshed four times a second; drawing drops to ~30 fps when the view is still; the browser pauses drawing in hidden tabs.
+- **Next:** reuse gradients (lantern, desk glow), skip rooms that are off screen, measure sign text once.
+- **Later:** a low-power toggle (1× pixel ratio, 20 fps, no small scenery), a light list view for phones, offscreen bitmaps for the lawn and floors only if the above is not enough.
 
 ---
 
@@ -297,8 +308,8 @@ Kit → Red Fox → Silver Fox → Arctic Fox → Nine-Tailed Kitsune.
 ## 9. Website screens
 
 1. **Landing page** — hero animation of the den, waitlist, "how it works", privacy promise.
-2. **HQ floor (home)** — every repo den on one explorable floor, with branch corners and a department list in the side panel; "needs you" alerts with approve/go-there actions.
-3. **Den (per repo)** — 3D world + HUD: level/XP bar, live indicator, "needs you" alert bar with approve/open actions.
+2. **HQ floor (home)** — the Commons and a pyramid of dens on one explorable hillside, a department list in the side panel, a [ ] button that fits every den on screen, and "needs you" alerts with approve/go-there actions. Clicking a den opens its den panel (tasks and open PRs, see §11).
+3. **Den (per repo)** — the den up close + HUD; its side panel lists the repo's tasks (`TASKS.md`) and open pull requests, and a task can be dragged onto a fox: level/XP bar, live indicator, "needs you" alert bar with approve/open actions.
 4. **Fox detail panel** — current task, timeline, tokens, cost.
 5. **Stats** — daily/weekly recap, time and tokens per quest, cost trends, wait-for-you time; filter by repo or see all.
 6. **Quests & achievements** — quest board, trophy shelf.
@@ -339,9 +350,24 @@ Extras: cosmetic packs/seasonal items, cost analytics reports, sponsored integra
 - [ ] Local server + WebSocket, plain live event list.
 - [ ] Iso room with one fox: walk, sit, type, raise paw, sleep.
 - [ ] Multiple foxes, branch corners (one desk per agent), stations, subagent cubs.
-- [ ] Route sessions to a den per repo and a corner per branch; one local HQ floor with all dens.
+- [x] Route sessions to a den per repo and a corner per branch; one local HQ floor with all dens (canvas prototype: pyramid grid, [ ] fit button, glass fronts).
+- [ ] Performance pass (batching, per-frame geometry, frame cap).
 - [ ] Personal XP, levels, achievements (local SQLite).
 - [ ] Publish plugin from this repo.
+
+### Phase 1.5 — Den panel (manage from the dashboard)
+
+Clicking a den opens a side panel with the repo's tasks and open pull requests; a task can be dragged onto a fox. Local only, user-initiated, nothing runs without an explicit drop and confirm.
+
+- [ ] Server hardening before any write route: per-run token, Origin check, JSON-only writes, body cap.
+- [ ] The hook records each repo's local path on `SessionStart` (local file only, never in the event stream).
+- [ ] `GET /api/prs` via the `gh` CLI (cached, no secrets in the repo); `GET /api/tasks` from `TASKS.md` (`- [ ]` items grouped by `## Ready / Doing / Done`, optional `<!-- id:… -->`, `#labels`, `~S/M/L`).
+- [ ] Read-only den panel: Tasks and Pull requests tabs; clicking a PR jumps to its branch corner.
+- [ ] Assign a task: inbox file per session, delivered by the `Stop` hook (`decision: block` with the task text, guarded by `stop_hook_active`) or the next `UserPromptSubmit`; an "Assign to…" button first, for keyboard users.
+- [ ] Drag a task card onto a fox (pointer events, valid-target rings, confirm popover, scroll and confetti on drop).
+- [ ] Later: a Foxhole MCP server in the plugin (`foxhole_next_task`), GitHub issues and Linear as task sources, hosted assignment via the GitHub App.
+
+Task text and PR titles are untrusted input: capped, framed as a user request, never assigned automatically, and never written to `events.jsonl`.
 
 ### Phase 2 — Hosted (weeks 5–8)
 
@@ -380,7 +406,7 @@ foxhole-hq/
 │   ├── schema/         # shared event + scoring types (TS)
 │   └── scoring/        # impact & efficiency scoring logic + tests
 ├── apps/
-│   ├── web/            # React + R3F site (den, stats, ladder)
+│   ├── web/            # den page (canvas prototype now; React app shell later)
 │   ├── api/            # Cloudflare Worker + Durable Objects
 │   └── github-app/     # verification webhooks
 └── assets/             # CC0 models, textures, sounds (with licenses)
@@ -397,7 +423,7 @@ Monorepo with **pnpm workspaces** + **Turborepo**, TypeScript everywhere, Zod fo
 - **Token data access** — confirm reliable per-session usage for each agent tool.
 - **Codex hook surface** — verify the best current integration point.
 - **Free-tier limits** — monitor Cloudflare/Supabase quotas; batching keeps usage low. One den per repo means more Durable Objects; idle dens hibernate, and the HQ floor reads summaries rather than full event streams.
-- **Many dens** — someone with dozens of repos needs the HQ floor to stay readable: lay dens out in a grid that grows with the account, shrink dens with no activity in the last week, and let people pin favorites near the Commons. Branches pile up the same way, so corners for merged or stale branches should fold away.
+- **Many dens** — the grid grows a row then a column up to 6×6 (35 dens); later repos wait in the Commons, and idle dens close after 5 minutes, last in first out. Still open: pinning favourites near the Commons, and folding away stale branch corners.
 - **Asset licensing** — use CC0 only; track licenses in `assets/`.
 - **Trust** — publish the plugin source openly so users can verify exactly what is sent.
 
@@ -405,7 +431,7 @@ Monorepo with **pnpm workspaces** + **Turborepo**, TypeScript everywhere, Zod fo
 
 ## 14. Next steps
 
-1. Scaffold the monorepo.
-2. Build Phase 0 hooks logger and verify the event + token data.
-3. Prototype the iso room with one animated fox.
+1. Finish the performance pass (§7).
+2. Read-only den panel: tasks from `TASKS.md` and open PRs via `gh` (§11, Phase 1.5).
+3. Task hand-off to a running session via the Stop hook.
 4. Put up the landing page + waitlist.

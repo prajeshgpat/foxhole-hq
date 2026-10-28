@@ -9,3 +9,4 @@ dist
 
 # per-developer Claude Code settings
 .claude/settings.local.json
+tmp
