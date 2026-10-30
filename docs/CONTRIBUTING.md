@@ -35,4 +35,4 @@ Foxhole's promise is metadata only. Any change that touches what an event contai
 
 - keep the schema strict (no free-form fields),
 - add tests showing secrets, prompts and file contents do not end up in events,
-- update the privacy section of PLAN.md if the set of fields changes.
+- update the privacy section of PLAN.md (in this folder) if the set of fields changes.

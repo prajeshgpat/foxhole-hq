@@ -13,4 +13,4 @@
 
 - [ ] Added a changeset (`pnpm changeset`) if a package changed
 - [ ] No code, prompts, diffs or file contents can leave the machine because of this change
-- [ ] Docs (README, PLAN.md) updated if behaviour or architecture changed
+- [ ] Docs (README, docs/PLAN.md) updated if behaviour or architecture changed

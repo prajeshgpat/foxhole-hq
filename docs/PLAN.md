@@ -399,7 +399,7 @@ Task text and PR titles are untrusted input: capped, framed as a user request, n
 
 ```
 foxhole-hq/
-├── PLAN.md
+├── docs/           # PLAN.md, CONTRIBUTING.md
 ├── README.md
 ├── packages/
 │   ├── agent/          # foxhole CLI: normalize, batch, sign, send
