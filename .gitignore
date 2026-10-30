@@ -13,6 +13,7 @@ tmp
 .env
 # per-developer project instructions
 CLAUDE.md
+.claude-plugin
 
 # env variants (keep a committed .env.example if one is added)
 .env.*
