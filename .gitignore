@@ -28,3 +28,14 @@ Thumbs.db
 # private keys and certificates
 *.pem
 *.key
+.claude
+
+# package manager and tool caches
+.pnpm-store
+.cache
+.vite
+*.tgz
+
+# test and editor leftovers
+*.swp
+*.orig
