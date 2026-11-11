@@ -1,6 +1,6 @@
 {
   "name": "@foxhole-hq/agent",
-  "version": "0.0.0",
+  "version": "0.1.0",
   "private": true,
   "description": "The foxhole CLI: turns agent hook payloads into metadata-only Foxhole events.",
   "license": "MIT",

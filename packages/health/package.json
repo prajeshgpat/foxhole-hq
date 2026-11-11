@@ -1,6 +1,6 @@
 {
   "name": "@foxhole-hq/health",
-  "version": "0.0.0",
+  "version": "0.0.1",
   "private": true,
   "description": "Pure session health rules (loop, error streak, stall, collision and more) computed from Foxhole events.",
   "license": "MIT",

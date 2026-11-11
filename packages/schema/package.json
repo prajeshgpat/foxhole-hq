@@ -1,6 +1,6 @@
 {
   "name": "@foxhole-hq/schema",
-  "version": "0.0.0",
+  "version": "0.1.0",
   "private": true,
   "description": "The Foxhole event format, shared by every adapter, the API and the web app.",
   "license": "MIT",
