@@ -49,6 +49,12 @@ importers:
         specifier: ^9.0.0
         version: 9.0.0(postcss@8.5.31)(typescript@5.9.3)(yaml@2.9.1)
 
+  packages/health:
+    dependencies:
+      '@foxhole-hq/schema':
+        specifier: workspace:*
+        version: link:../schema
+
   packages/plugin-claude:
     dependencies:
       '@foxhole-hq/agent':

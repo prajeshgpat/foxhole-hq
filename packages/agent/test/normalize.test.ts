@@ -113,9 +113,44 @@ describe("normalizeClaudeHook", () => {
     expect(run({ hook_event_name: "PreToolUse", tool_name: "Read" }, { usage })?.usage).toBeUndefined();
   });
 
-  it("leaves repo and branch off outside a git repo", () => {
+  it("files sessions git says are outside any repo in the scratch den with no branch", () => {
+    const e = run({ hook_event_name: "SessionStart" }, { repo: { notRepo: true } });
+    expect(e?.repo).toBe("scratch");
+    expect(e).not.toHaveProperty("branch");
+  });
+
+  it("leaves repo and branch unset when git failed, so the session keeps its last den", () => {
     const e = run({ hook_event_name: "SessionStart" }, { repo: {} });
     expect(e).not.toHaveProperty("repo");
     expect(e).not.toHaveProperty("branch");
+    expect(safeParseEvent(e).success).toBe(true);
+  });
+
+  it("drops a stray branch when there is no repo", () => {
+    const e = run({ hook_event_name: "SessionStart" }, { repo: { branch: "main" } });
+    expect(e).not.toHaveProperty("repo");
+    expect(e).not.toHaveProperty("branch");
+  });
+
+  it("keeps a local/<folder>~<tag> key and its branch, and passes the schema", () => {
+    const e = run(
+      { hook_event_name: "SessionStart" },
+      { repo: { repo: "local/notes~a1b2c3", branch: "main" } },
+    );
+    expect(e).toMatchObject({ repo: "local/notes~a1b2c3", branch: "main" });
+    expect(safeParseEvent(e).success).toBe(true);
+  });
+
+  it("keeps subagents in the parent's scratch den", () => {
+    const e = run({ hook_event_name: "SubagentStop", agent_id: "sub-1" }, { repo: { notRepo: true } });
+    expect(e).toMatchObject({ repo: "scratch", parentSessionId: "abc-123" });
+  });
+
+  it("puts no absolute path in the event for a session in a local repo", () => {
+    const e = run(
+      { hook_event_name: "SessionStart" },
+      { repo: { repo: "local/notes~a1b2c3", branch: "main", root: "/home/dev/notes" } },
+    );
+    expect(JSON.stringify(e)).not.toContain("/home/dev");
   });
 });

@@ -15,3 +15,18 @@ export {
   type Assignment,
   type InboxItem,
 } from "./assign";
+export {
+  DEFAULT_RETENTION_DAYS,
+  FOLD_EPOCH,
+  QUIET_ASLEEP_MS,
+  applyEvents,
+  applyEventsInPlace,
+  pruneStale,
+  foldEvents,
+  snapshotOf,
+  type SessionMap,
+  type SessionState,
+  type SessionStatus,
+  type SessionUsage,
+  type Snapshot,
+} from "./state";

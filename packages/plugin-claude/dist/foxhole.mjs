@@ -94,7 +94,7 @@ function readTasksFile(root) {
 }
 
 // src/store.ts
-import { randomUUID } from "crypto";
+import { randomBytes, randomUUID } from "crypto";
 import { appendFileSync, existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from "fs";
 import os from "os";
 import path2 from "path";
@@ -577,8 +577,8 @@ function getErrorMap() {
 
 // ../../node_modules/.pnpm/zod@3.25.76/node_modules/zod/v3/helpers/parseUtil.js
 var makeIssue = (params) => {
-  const { data, path: path5, errorMaps, issueData } = params;
-  const fullPath = [...path5, ...issueData.path || []];
+  const { data, path: path6, errorMaps, issueData } = params;
+  const fullPath = [...path6, ...issueData.path || []];
   const fullIssue = {
     ...issueData,
     path: fullPath
@@ -694,11 +694,11 @@ var errorUtil;
 
 // ../../node_modules/.pnpm/zod@3.25.76/node_modules/zod/v3/types.js
 var ParseInputLazyPath = class {
-  constructor(parent, value, path5, key) {
+  constructor(parent, value, path6, key) {
     this._cachedPath = [];
     this.parent = parent;
     this.data = value;
-    this._path = path5;
+    this._path = path6;
     this._key = key;
   }
   get path() {
@@ -4193,6 +4193,17 @@ function safeParseEvent(input) {
   return FoxholeEvent.safeParse(input);
 }
 
+// ../schema/src/lifecycle.ts
+var ENDING_TYPES = /* @__PURE__ */ new Set(["session.end", "subagent.stop"]);
+var PERMISSION_CLEARING_TYPES = /* @__PURE__ */ new Set([
+  "tool.start",
+  "tool.end",
+  "prompt.submit",
+  "turn.end",
+  "session.end",
+  "subagent.stop"
+]);
+
 // src/usage.ts
 import { closeSync as closeSync2, fstatSync as fstatSync2, openSync as openSync2, readSync as readSync2, statSync } from "fs";
 var emptyCursor = () => ({ offset: 0, seen: [] });
@@ -4296,6 +4307,28 @@ function machineId(home) {
   const id = "m_" + randomUUID().replace(/-/g, "").slice(0, 12);
   writeFileSync(file, id + "\n", { mode: 384 });
   return id;
+}
+var LOCAL_KEY_FILE = "local-key";
+var LOCAL_KEY_BYTES = 32;
+var LOCAL_KEY_PATTERN = new RegExp(`^[0-9a-f]{${LOCAL_KEY_BYTES * 2}}$`);
+var readLocalKey = (file) => {
+  try {
+    const value = readFileSync(file, "utf8").trim();
+    return LOCAL_KEY_PATTERN.test(value) ? value : null;
+  } catch {
+    return null;
+  }
+};
+function localKeySecret(home) {
+  const file = path2.join(home, LOCAL_KEY_FILE);
+  const existing = readLocalKey(file);
+  if (existing) return existing;
+  try {
+    ensureDir(home);
+    writeFileSync(file, randomBytes(LOCAL_KEY_BYTES).toString("hex") + "\n", { mode: 384, flag: "wx" });
+  } catch {
+  }
+  return readLocalKey(file);
 }
 var eventsFile = (home) => path2.join(home, "events.jsonl");
 function appendEvent(home, event) {
@@ -4447,6 +4480,8 @@ import { randomUUID as randomUUID3 } from "crypto";
 
 // src/git.ts
 import { execFileSync } from "child_process";
+import { createHmac } from "crypto";
+import path4 from "path";
 function normalizeRemote(url) {
   const trimmed = url.trim();
   if (!trimmed) return null;
@@ -4469,40 +4504,73 @@ function normalizeRemote(url) {
   if (!host || !clean2) return null;
   return `${host.toLowerCase()}/${clean2}`;
 }
-function git(cwd, args) {
+var GIT_TIMEOUT_MS = 800;
+var GIT_NOT_A_REPO_STATUS = 128;
+var NOT_A_REPO_MESSAGE = /not a git repository/i;
+function classifyFailure(err) {
+  const e = err;
+  const stderr = typeof e.stderr === "string" ? e.stderr : Buffer.isBuffer(e.stderr) ? e.stderr.toString("utf8") : "";
+  if (e.status === GIT_NOT_A_REPO_STATUS && NOT_A_REPO_MESSAGE.test(stderr)) return { kind: "not-repo" };
+  return { kind: "failed" };
+}
+var runGit = (cwd, args) => {
   try {
-    return execFileSync("git", args, {
+    const out = execFileSync("git", args, {
       cwd,
       encoding: "utf8",
-      timeout: 800,
-      stdio: ["ignore", "pipe", "ignore"]
-    }).trim() || null;
-  } catch {
-    return null;
+      timeout: GIT_TIMEOUT_MS,
+      stdio: ["ignore", "pipe", "pipe"]
+    }).trim();
+    return { kind: "ok", out };
+  } catch (err) {
+    return classifyFailure(err);
   }
+};
+var okOutput = (r) => r.kind === "ok" && r.out ? r.out : null;
+var SCRATCH_REPO = "scratch";
+var LOCAL_PREFIX = "local/";
+var LOCAL_TAG_SEPARATOR = "~";
+var SHORT_TAG_LENGTH = 6;
+var HASHED_TAG_LENGTH = 10;
+var MAX_FOLDER_LENGTH = 40;
+function sanitizeFolderName(name) {
+  const clean2 = name.replace(/[\u0000-\u001f\u007f-\u009f]/g, "").replace(/[\\/]/g, "").trim();
+  return Array.from(clean2).slice(0, MAX_FOLDER_LENGTH).join("") || "unnamed";
 }
-function repoInfo(cwd) {
-  const info = {};
-  const remote = git(cwd, ["remote", "get-url", "origin"]);
-  const repo = remote ? normalizeRemote(remote) : null;
-  if (repo) info.repo = repo;
-  const branch = git(cwd, ["symbolic-ref", "--short", "-q", "HEAD"]);
+var repoTag = (secret, root) => createHmac("sha256", Buffer.from(secret, "hex")).update(root).digest("hex");
+function localRepoKey(root, mode, secret) {
+  if (!secret) return null;
+  const tag = repoTag(secret, root);
+  if (mode !== "short") return LOCAL_PREFIX + tag.slice(0, HASHED_TAG_LENGTH);
+  const folder = sanitizeFolderName(path4.basename(root));
+  return LOCAL_PREFIX + folder + LOCAL_TAG_SEPARATOR + tag.slice(0, SHORT_TAG_LENGTH);
+}
+function repoInfo(cwd, mode, opts) {
+  const run = opts.run ?? runGit;
+  const top = run(cwd, ["rev-parse", "--show-toplevel"]);
+  if (top.kind === "not-repo") return { notRepo: true };
+  const root = okOutput(top);
+  if (!root) return {};
+  const remote = okOutput(run(cwd, ["remote", "get-url", "origin"]));
+  const repo = (remote ? normalizeRemote(remote) : null) ?? localRepoKey(root, mode, localKeySecret(opts.home));
+  if (!repo) return {};
+  const info = { repo, root };
+  const branch = okOutput(run(cwd, ["symbolic-ref", "--short", "-q", "HEAD"]));
   if (branch) info.branch = branch;
   return info;
 }
-var repoRoot = (cwd) => git(cwd, ["rev-parse", "--show-toplevel"]);
 
 // src/target.ts
 import { createHash as createHash2 } from "crypto";
-import path4 from "path";
+import path5 from "path";
 var str = (v) => typeof v === "string" && v.length > 0 ? v : void 0;
 function clip(label) {
   return label.length > MAX_TARGET_LENGTH ? label.slice(0, MAX_TARGET_LENGTH - 1) + "\u2026" : label;
 }
 function shortPath(filePath, cwd) {
-  const rel = path4.relative(cwd, filePath);
-  if (rel && !rel.startsWith("..") && !path4.isAbsolute(rel)) return rel.split(path4.sep).join("/");
-  return path4.basename(filePath);
+  const rel = path5.relative(cwd, filePath);
+  if (rel && !rel.startsWith("..") && !path5.isAbsolute(rel)) return rel.split(path5.sep).join("/");
+  return path5.basename(filePath);
 }
 var WORD = /^[A-Za-z0-9_.:/][A-Za-z0-9_.:/-]*$/;
 var ENV_ASSIGN = /^[A-Za-z_][A-Za-z0-9_]*=/;
@@ -4516,7 +4584,7 @@ function shortCommand(command) {
     kept.push(t);
   }
   if (!kept.length) return null;
-  kept[0] = path4.basename(kept[0]);
+  kept[0] = path5.basename(kept[0]);
   return kept.join(" ");
 }
 function hostname(url) {
@@ -4556,9 +4624,10 @@ function shortTarget(tool, input, cwd) {
       return null;
   }
 }
+var shortHash = (label) => createHash2("sha256").update(label).digest("hex").slice(0, 10);
 function applyMode(label, mode) {
   if (label == null || mode === "hidden") return null;
-  if (mode === "hash") return "h:" + createHash2("sha256").update(label).digest("hex").slice(0, 10);
+  if (mode === "hash") return "h:" + shortHash(label);
   return clip(label);
 }
 function targetFor(tool, input, cwd, mode) {
@@ -4620,8 +4689,9 @@ function normalizeClaudeHook(input, ctx) {
     event.target = targetFor(input.tool_name, input.tool_input, input.cwd ?? process.cwd(), ctx.targetMode);
   }
   if ((mapped.type === "turn.end" || mapped.type === "session.end") && ctx.usage) event.usage = ctx.usage;
-  if (ctx.repo.repo) event.repo = ctx.repo.repo;
-  if (ctx.repo.branch) event.branch = ctx.repo.branch;
+  const repo = ctx.repo.repo ?? (ctx.repo.notRepo ? SCRATCH_REPO : void 0);
+  if (repo) event.repo = repo;
+  if (ctx.repo.repo && ctx.repo.branch) event.branch = ctx.repo.branch;
   return event;
 }
 
@@ -4646,10 +4716,9 @@ function handleClaudeHook(raw, opts) {
     usage = read.usage;
     writeCursor(opts.home, payload.session_id, read.cursor);
   }
-  const repo = repoInfo(cwd);
-  if (repo.repo && (payload.hook_event_name === "SessionStart" || payload.hook_event_name === "UserPromptSubmit")) {
-    const root = repoRoot(cwd);
-    if (root) recordRepo(opts.home, repo.repo, root);
+  const repo = repoInfo(cwd, config.targets, { home: opts.home });
+  if (repo.repo && repo.root && (payload.hook_event_name === "SessionStart" || payload.hook_event_name === "UserPromptSubmit")) {
+    recordRepo(opts.home, repo.repo, repo.root);
   }
   const event = normalizeClaudeHook(payload, {
     id: randomUUID3(),
@@ -4667,7 +4736,7 @@ function handleClaudeHook(raw, opts) {
 }
 
 // src/serve.ts
-import { randomBytes, timingSafeEqual } from "crypto";
+import { randomBytes as randomBytes2, timingSafeEqual } from "crypto";
 import { closeSync as closeSync3, openSync as openSync3, readFileSync as readFileSync3, readSync as readSync3, statSync as statSync2 } from "fs";
 import { createServer } from "http";
 
@@ -4741,6 +4810,138 @@ async function listPrs(repo, exec = runGh, now = Date.now()) {
   return result;
 }
 
+// src/state.ts
+var QUIET_ASLEEP_MS = 30 * 60 * 1e3;
+var DEFAULT_RETENTION_DAYS = 7;
+var MS_PER_DAY = 24 * 60 * 60 * 1e3;
+var STATUS_ORDER = ["needs-you", "stuck", "working", "idle", "done", "asleep"];
+var CLEARS_TOOL = /* @__PURE__ */ new Set([
+  "session.start",
+  "prompt.submit",
+  "tool.end",
+  "turn.end",
+  "session.end",
+  "subagent.stop"
+]);
+function newSession(e) {
+  return {
+    sessionId: e.sessionId,
+    parentSessionId: e.parentSessionId,
+    source: e.source,
+    machineId: e.machineId,
+    repo: null,
+    branch: null,
+    agentType: null,
+    status: "idle",
+    statusSince: e.ts,
+    lastEventAt: e.ts,
+    currentTool: null,
+    currentTarget: null,
+    turnCount: 0,
+    toolCallCount: 0,
+    errorCount: 0,
+    pendingPermission: false,
+    usage: { inputTokens: 0, outputTokens: 0, cacheReadTokens: 0, cacheWriteTokens: 0, model: null }
+  };
+}
+function nextStatus(current, type) {
+  if (type === "session.start") return "idle";
+  if (type === "prompt.submit") return "working";
+  if (ENDING_TYPES.has(type)) return "asleep";
+  if (current === "asleep") return "asleep";
+  switch (type) {
+    case "tool.start":
+    case "tool.end":
+      return "working";
+    case "permission.request":
+      return "needs-you";
+    case "session.waiting":
+      return current === "needs-you" ? "needs-you" : "idle";
+    case "turn.end":
+      return "idle";
+    default:
+      return current;
+  }
+}
+function addUsage(total, usage) {
+  if (!usage) return total;
+  return {
+    inputTokens: total.inputTokens + usage.inputTokens,
+    outputTokens: total.outputTokens + usage.outputTokens,
+    cacheReadTokens: total.cacheReadTokens + (usage.cacheReadTokens ?? 0),
+    cacheWriteTokens: total.cacheWriteTokens + (usage.cacheWriteTokens ?? 0),
+    model: usage.model ?? total.model
+  };
+}
+function currentToolAfter(s, e, status) {
+  if (e.type === "tool.start" && status !== "asleep") {
+    return { currentTool: e.tool ?? null, currentTarget: e.target ?? null };
+  }
+  if (CLEARS_TOOL.has(e.type)) return { currentTool: null, currentTarget: null };
+  return { currentTool: s.currentTool, currentTarget: s.currentTarget };
+}
+function pendingAfter(s, e, status) {
+  if (status === "asleep" || e.type === "session.start") return false;
+  if (e.type === "permission.request") return true;
+  return s.pendingPermission && !PERMISSION_CLEARING_TYPES.has(e.type);
+}
+function applyOne(s, e) {
+  const status = nextStatus(s.status, e.type);
+  return {
+    ...s,
+    parentSessionId: s.parentSessionId ?? e.parentSessionId,
+    repo: e.repo ?? s.repo,
+    branch: e.branch ?? s.branch,
+    agentType: e.agentType ?? s.agentType,
+    status,
+    statusSince: status === s.status ? s.statusSince : e.ts,
+    lastEventAt: e.ts,
+    ...currentToolAfter(s, e, status),
+    turnCount: s.turnCount + (e.type === "turn.end" ? 1 : 0),
+    toolCallCount: s.toolCallCount + (e.type === "tool.start" ? 1 : 0),
+    errorCount: s.errorCount + (e.type === "tool.end" && e.status === "error" ? 1 : 0),
+    pendingPermission: pendingAfter(s, e, status),
+    usage: addUsage(s.usage, e.usage)
+  };
+}
+function applyEventsInPlace(state, events) {
+  for (const e of events) state.set(e.sessionId, applyOne(state.get(e.sessionId) ?? newSession(e), e));
+}
+function atTime(s, nowMs) {
+  if (s.status === "asleep" || s.pendingPermission || s.currentTool !== null) return s;
+  const quietFor = nowMs - Date.parse(s.lastEventAt);
+  if (!(quietFor >= QUIET_ASLEEP_MS)) return s;
+  return {
+    ...s,
+    status: "asleep",
+    statusSince: new Date(Date.parse(s.lastEventAt) + QUIET_ASLEEP_MS).toISOString()
+  };
+}
+function isStale(s, nowMs, retentionDays) {
+  return s.status === "asleep" && nowMs - Date.parse(s.statusSince) > retentionDays * MS_PER_DAY;
+}
+function pruneStale(state, now, retentionDays = DEFAULT_RETENTION_DAYS) {
+  const nowMs = now.getTime();
+  let dropped = 0;
+  for (const [id, s] of state) {
+    if (!isStale(atTime(s, nowMs), nowMs, retentionDays)) continue;
+    state.delete(id);
+    dropped++;
+  }
+  return dropped;
+}
+function bySeverity(a, b) {
+  const rank = STATUS_ORDER.indexOf(a.status) - STATUS_ORDER.indexOf(b.status);
+  if (rank) return rank;
+  const since = Date.parse(a.statusSince) - Date.parse(b.statusSince);
+  return since || a.sessionId.localeCompare(b.sessionId);
+}
+function snapshotOf(state, now, version, retentionDays = DEFAULT_RETENTION_DAYS) {
+  const nowMs = now.getTime();
+  const sessions = [...state.values()].map((s) => atTime(s, nowMs)).filter((s) => !isStale(s, nowMs, retentionDays)).sort(bySeverity);
+  return { version, generatedAt: now.toISOString(), sessions };
+}
+
 // src/serve.ts
 var DEFAULT_PORT = 4317;
 var BACKLOG_EVENTS = 500;
@@ -4749,8 +4950,14 @@ var HEARTBEAT_MS = 15e3;
 var NEWLINE = 10;
 var MAX_BODY = 8 * 1024;
 var TAIL_BYTES = 1024 * 1024;
+var READ_CHUNK_BYTES = 4 * 1024 * 1024;
+var EPOCH_BYTES = 4;
+var MAX_ID_DIGITS = 15;
+var ID_PATTERN = new RegExp(`^([0-9a-f]{${EPOCH_BYTES * 2}})-(\\d{1,${MAX_ID_DIGITS}})$`);
 var TOKEN_META = '<meta name="foxhole-token" content="">';
 var REPO_KEY = /^(?!\.)[\w.-]+(\/(?!\.)[\w.-]+){2}$/;
+var LOCAL_KEY = /^local\/[^\\/\u0000-\u001f\u007f-\u009f]{1,47}$/u;
+var isRepoKey = (repo) => repo === SCRATCH_REPO || REPO_KEY.test(repo) || LOCAL_KEY.test(repo);
 function parseLines(text) {
   return text.split("\n").flatMap((line2) => {
     if (!line2.trim()) return [];
@@ -4779,39 +4986,57 @@ function readRange(file, start, end) {
   }
   return buf;
 }
-function followEvents(file, pollMs, onEvents) {
-  let offset = sizeOf(file);
+function followEvents(file, pollMs, handlers) {
+  let offset = 0;
   let pending = Buffer.alloc(0);
+  const readSlice = (size) => {
+    const end = Math.min(size, offset + READ_CHUNK_BYTES);
+    const chunk = Buffer.concat([pending, readRange(file, offset, end)]);
+    offset = end;
+    const lastNewline = chunk.lastIndexOf(NEWLINE);
+    pending = chunk.subarray(lastNewline + 1);
+    if (lastNewline < 0) return;
+    const events = parseLines(chunk.subarray(0, lastNewline).toString("utf8"));
+    if (events.length) handlers.onEvents(events);
+  };
   const poll = () => {
     const size = sizeOf(file);
     if (size < offset) {
       offset = 0;
       pending = Buffer.alloc(0);
+      handlers.onReset();
     }
-    if (size === offset) return;
-    const chunk = Buffer.concat([pending, readRange(file, offset, size)]);
-    offset = size;
-    const end = chunk.lastIndexOf(NEWLINE);
-    pending = chunk.subarray(end + 1);
-    if (end < 0) return;
-    const events = parseLines(chunk.subarray(0, end).toString("utf8"));
-    if (events.length) onEvents(events);
+    while (offset < size) readSlice(size);
   };
-  const timer = setInterval(() => {
+  const safePoll = () => {
     try {
       poll();
     } catch (err) {
       process.stderr.write(`foxhole serve: could not read ${file}: ${err.message}
 `);
     }
-  }, pollMs);
+  };
+  safePoll();
+  const timer = setInterval(safePoll, pollMs);
   return {
-    /** Bytes already handed to onEvents (or before the start), i.e. what a new viewer's backlog covers. */
+    /** Bytes already handed to onEvents, i.e. what a new viewer's backlog covers. */
     consumed: () => offset - pending.length,
     stop: () => clearInterval(timer)
   };
 }
-var sse = (res, data, name) => res.write(`${name ? `event: ${name}
+function requestedId(req, url) {
+  const header = req.headers["last-event-id"];
+  const raw = Array.isArray(header) ? header.join(",") : header ?? url.searchParams.get("since");
+  if (raw === void 0 || raw === null) return null;
+  const match = ID_PATTERN.exec(raw);
+  return match ? { epoch: match[1], n: Number(match[2]) } : "invalid";
+}
+var newEpoch = (previous) => {
+  const epoch = randomBytes2(EPOCH_BYTES).toString("hex");
+  return epoch === previous ? newEpoch(previous) : epoch;
+};
+var sse = (res, data, name, id) => res.write(`${id === void 0 ? "" : `id: ${id}
+`}${name ? `event: ${name}
 ` : ""}data: ${data}
 
 `);
@@ -4857,11 +5082,29 @@ function latestBySession(file) {
 function startServer(opts) {
   const file = eventsFile(opts.home);
   const viewers = /* @__PURE__ */ new Set();
-  const follower = followEvents(file, opts.pollMs ?? POLL_MS, (events) => {
-    for (const res of viewers) for (const e of events) sse(res, JSON.stringify(e));
+  let epoch = newEpoch();
+  let eventCount = 0;
+  const idOf = (n2) => `${epoch}-${n2}`;
+  const lastId = () => eventCount ? idOf(eventCount - 1) : null;
+  const sessions = /* @__PURE__ */ new Map();
+  const follower = followEvents(file, opts.pollMs ?? POLL_MS, {
+    onEvents: (events) => {
+      const firstN = eventCount;
+      applyEventsInPlace(sessions, events);
+      pruneStale(sessions, /* @__PURE__ */ new Date());
+      eventCount += events.length;
+      for (const res of viewers)
+        events.forEach((e, i) => sse(res, JSON.stringify(e), void 0, idOf(firstN + i)));
+    },
+    onReset: () => {
+      epoch = newEpoch(epoch);
+      eventCount = 0;
+      sessions.clear();
+      for (const res of viewers) sse(res, "{}", "resync");
+    }
   });
   let port = 0;
-  const token = randomBytes(24).toString("hex");
+  const token = randomBytes2(24).toString("hex");
   const canAssign = opts.assign !== false;
   let lastAssignments = JSON.stringify(readAssignments(opts.home));
   const assignTimer = setInterval(() => {
@@ -4874,15 +5117,32 @@ function startServer(opts) {
       for (const res of viewers) sse(res, JSON.stringify(a), "assign");
     }
   }, opts.pollMs ?? POLL_MS);
-  const openStream = (req, res) => {
+  const replayFor = (requested) => {
+    const upTo = follower.consumed();
+    const all = upTo ? parseLines(readRange(file, 0, upTo).toString("utf8")) : [];
+    const numbered = all.map((e, i) => [idOf(i), e]);
+    if (requested === null) return { events: numbered.slice(-BACKLOG_EVENTS), resync: false };
+    const last = all.length - 1;
+    const resumable = requested !== "invalid" && requested.epoch === epoch && requested.n <= last && last - requested.n <= BACKLOG_EVENTS;
+    if (!resumable) return { events: numbered.slice(-BACKLOG_EVENTS), resync: true };
+    return { events: numbered.slice(requested.n + 1), resync: false };
+  };
+  const openStream = (req, res, url) => {
+    let replay;
+    try {
+      replay = replayFor(requestedId(req, url));
+    } catch (err) {
+      process.stderr.write(`foxhole serve: could not replay events: ${err.message}
+`);
+      replay = { events: [], resync: true };
+    }
     res.writeHead(200, {
       "Content-Type": "text/event-stream; charset=utf-8",
       "Cache-Control": "no-store",
       Connection: "keep-alive"
     });
-    const upTo = follower.consumed();
-    const backlog = upTo ? parseLines(readRange(file, 0, upTo).toString("utf8")).slice(-BACKLOG_EVENTS) : [];
-    for (const e of backlog) sse(res, JSON.stringify(e));
+    if (replay.resync) sse(res, "{}", "resync");
+    for (const [id, e] of replay.events) sse(res, JSON.stringify(e), void 0, id);
     for (const a of Object.values(readAssignments(opts.home))) sse(res, JSON.stringify(a), "assign");
     sse(res, "{}", "ready");
     viewers.add(res);
@@ -4907,9 +5167,14 @@ function startServer(opts) {
   };
   async function api(req, res, url) {
     if (!apiAllowed(req)) return void json(res, 403, { error: "Forbidden" });
+    if (req.method === "GET" && url.pathname === "/api/state") {
+      const now = /* @__PURE__ */ new Date();
+      pruneStale(sessions, now);
+      return void json(res, 200, snapshotOf(sessions, now, lastId()));
+    }
     const repo = url.searchParams.get("repo") ?? "";
     if (req.method === "GET" && url.pathname === "/api/tasks") {
-      if (!REPO_KEY.test(repo)) return void json(res, 400, { error: "Unknown repo" });
+      if (!isRepoKey(repo)) return void json(res, 400, { error: "Unknown repo" });
       const found = tasksFor(repo);
       const assigned = Object.values(readAssignments(opts.home)).filter(
         (a) => a.repo === repo && a.state !== "cancelled"
@@ -4924,14 +5189,14 @@ function startServer(opts) {
       });
     }
     if (req.method === "GET" && url.pathname === "/api/prs") {
-      if (!REPO_KEY.test(repo)) return void json(res, 400, { error: "Unknown repo" });
+      if (!isRepoKey(repo)) return void json(res, 400, { error: "Unknown repo" });
       return void json(res, 200, await listPrs(repo));
     }
     if (req.method === "POST" && url.pathname === "/api/assign") {
       if (!canAssign)
         return void json(res, 403, { error: "Task hand-off is off (foxhole serve --no-assign)" });
       const body = await readBody(req);
-      if (!body.repo || !REPO_KEY.test(body.repo) || !body.taskId || !body.sessionId)
+      if (!body.repo || !isRepoKey(body.repo) || !body.taskId || !body.sessionId)
         return void json(res, 400, { error: "Missing repo, taskId or sessionId" });
       const task = tasksFor(body.repo).tasks.find((t) => t.id === body.taskId);
       if (!task) return void json(res, 404, { error: "No such task" });
@@ -4972,7 +5237,7 @@ ${task.detail}` : task.title;
     } else if (req.method !== "GET") {
       res.writeHead(405).end("Method not allowed");
     } else if (url.pathname === "/events") {
-      openStream(req, res);
+      openStream(req, res, url);
     } else if (url.pathname === "/" && !url.searchParams.has("live")) {
       res.writeHead(302, { Location: "/?live" }).end();
     } else if (url.pathname === "/") {
