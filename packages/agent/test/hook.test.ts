@@ -1,5 +1,5 @@
 import { execFileSync, spawnSync } from "node:child_process";
-import { mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -101,6 +101,74 @@ describe("handleClaudeHook", () => {
   it("ignores malformed input", () => {
     expect(handleClaudeHook("{not json", { home })).toBeNull();
     expect(readEvents(home)).toHaveLength(0);
+  });
+
+  const localRepo = (...parts: string[]) => {
+    const dir = path.join(tmp(), ...parts);
+    mkdirSync(dir, { recursive: true });
+    execFileSync("git", ["init", "-q", "-b", "main"], { cwd: dir, stdio: "ignore" });
+    return dir;
+  };
+  const start = (cwd: string, sessionId = "s") =>
+    handleClaudeHook(JSON.stringify({ hook_event_name: "SessionStart", session_id: sessionId, cwd }), {
+      home,
+    });
+  const recorded = () =>
+    JSON.parse(readFileSync(path.join(home, "repos.json"), "utf8")) as Record<string, unknown>;
+
+  it("records a remote-less repo as local/<folder>~<tag> with its branch and no path", () => {
+    const dir = localRepo("outer-secret", "my-notes");
+    const event = start(dir, "s2");
+    expect(event).toMatchObject({ branch: "main" });
+    expect(event?.repo).toMatch(/^local\/my-notes~[0-9a-f]{6}$/);
+    const written = readFileSync(path.join(home, "events.jsonl"), "utf8");
+    expect(written).not.toContain(path.dirname(dir));
+    expect(written).not.toContain("outer-secret");
+  });
+
+  it("gives same-named remote-less repos in different places different den keys", () => {
+    const a = start(localRepo("work", "api"), "a");
+    const b = start(localRepo("personal", "api"), "b");
+    expect(a?.repo).not.toBe(b?.repo);
+  });
+
+  it("records where a local repo lives, under its unique key", () => {
+    const dir = localRepo("notes");
+    const event = start(dir);
+    expect(Object.keys(recorded())).toEqual([event?.repo]);
+  });
+
+  it("records a session outside git in the scratch den without a branch, and records no path", () => {
+    const event = start(tmp(), "s3");
+    expect(event?.repo).toBe("scratch");
+    expect(event).not.toHaveProperty("branch");
+    expect(() => recorded()).toThrow(); // repos.json was never written
+  });
+
+  it("leaves repo unset when git fails (missing directory), not scratch", () => {
+    const event = start(path.join(tmp(), "gone"), "s5");
+    expect(event).not.toBeNull();
+    expect(event).not.toHaveProperty("repo");
+  });
+
+  it("leaves repo unset and writes the event anyway when the local-key secret is unusable", () => {
+    mkdirSync(path.join(home, "local-key"));
+    const event = start(localRepo("notes"), "s6");
+    expect(event).not.toBeNull();
+    expect(event).not.toHaveProperty("repo");
+  });
+
+  it("uses an unnamed 10-hex key when targets mode is hash", () => {
+    writeFileSync(path.join(home, "config.json"), JSON.stringify({ targets: "hash" }));
+    const event = start(localRepo("private-name"), "s4");
+    expect(event?.repo).toMatch(/^local\/[0-9a-f]{10}$/);
+    expect(event?.repo).not.toContain("private-name");
+  });
+
+  it("uses an unnamed 10-hex key when targets mode is hidden", () => {
+    writeFileSync(path.join(home, "config.json"), JSON.stringify({ targets: "hidden" }));
+    const event = start(localRepo("private-name"), "s7");
+    expect(event?.repo).toMatch(/^local\/[0-9a-f]{10}$/);
   });
 });
 

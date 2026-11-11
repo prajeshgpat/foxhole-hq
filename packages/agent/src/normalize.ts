@@ -1,5 +1,5 @@
 import { MAX_TARGET_LENGTH, type EventType, type FoxholeEvent, type Usage } from "@foxhole-hq/schema";
-import type { RepoInfo } from "./git";
+import { SCRATCH_REPO, type RepoInfo } from "./git";
 import { targetFor, type TargetMode } from "./target";
 
 /**
@@ -95,7 +95,9 @@ export function normalizeClaudeHook(input: ClaudeHookInput, ctx: NormalizeContex
     event.target = targetFor(input.tool_name, input.tool_input, input.cwd ?? process.cwd(), ctx.targetMode);
   }
   if ((mapped.type === "turn.end" || mapped.type === "session.end") && ctx.usage) event.usage = ctx.usage;
-  if (ctx.repo.repo) event.repo = ctx.repo.repo;
-  if (ctx.repo.branch) event.branch = ctx.repo.branch;
+  // Scratch only when git said "not a repository". An unset repo (git failed) means "keep the last known den".
+  const repo = ctx.repo.repo ?? (ctx.repo.notRepo ? SCRATCH_REPO : undefined);
+  if (repo) event.repo = repo;
+  if (ctx.repo.repo && ctx.repo.branch) event.branch = ctx.repo.branch;
   return event;
 }

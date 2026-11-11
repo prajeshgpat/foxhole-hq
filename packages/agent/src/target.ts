@@ -90,9 +90,13 @@ export function shortTarget(tool: string, input: ToolInput, cwd: string): string
   }
 }
 
+/** The stable 10-character hash used wherever a label must stay recognisable but unreadable. */
+export const shortHash = (label: string): string =>
+  createHash("sha256").update(label).digest("hex").slice(0, 10);
+
 export function applyMode(label: string | null, mode: TargetMode): string | null {
   if (label == null || mode === "hidden") return null;
-  if (mode === "hash") return "h:" + createHash("sha256").update(label).digest("hex").slice(0, 10);
+  if (mode === "hash") return "h:" + shortHash(label);
   return clip(label);
 }
 

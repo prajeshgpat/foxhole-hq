@@ -1,4 +1,4 @@
-import { randomUUID } from "node:crypto";
+import { randomBytes, randomUUID } from "node:crypto";
 import { appendFileSync, existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
@@ -10,6 +10,7 @@ import { emptyCursor, type UsageCursor } from "./usage";
  * Everything Foxhole keeps locally lives in one private folder (default ~/.foxhole):
  *   events.jsonl      append-only log, one validated event per line
  *   machine-id        random id for this machine, created once
+ *   local-key         random per-install secret (hex) that keys the den ids of remote-less repos, created once
  *   config.json       user settings, e.g. { "targets": "hash" }
  *   state/<id>.json   per-session cursor into the transcript for token usage
  *   repos.json        { "host/owner/name": { path, seen } } where each repo lives on this machine (local only)
@@ -62,6 +63,37 @@ export function machineId(home: string): string {
   const id = "m_" + randomUUID().replace(/-/g, "").slice(0, 12);
   writeFileSync(file, id + "\n", { mode: 0o600 });
   return id;
+}
+
+export const LOCAL_KEY_FILE = "local-key";
+const LOCAL_KEY_BYTES = 32;
+const LOCAL_KEY_PATTERN = new RegExp(`^[0-9a-f]{${LOCAL_KEY_BYTES * 2}}$`);
+
+const readLocalKey = (file: string): string | null => {
+  try {
+    const value = readFileSync(file, "utf8").trim();
+    return LOCAL_KEY_PATTERN.test(value) ? value : null;
+  } catch {
+    return null;
+  }
+};
+
+/**
+ * The per-install secret that keys local repo ids: 32 random bytes as hex, created once with mode 0600.
+ * Returns null if it can neither be read nor created; callers must then leave the id unset, not fall back.
+ */
+export function localKeySecret(home: string): string | null {
+  const file = path.join(home, LOCAL_KEY_FILE);
+  const existing = readLocalKey(file);
+  if (existing) return existing;
+  try {
+    ensureDir(home);
+    // "wx" never overwrites: if another hook process won the race, read its secret instead.
+    writeFileSync(file, randomBytes(LOCAL_KEY_BYTES).toString("hex") + "\n", { mode: 0o600, flag: "wx" });
+  } catch {
+    // fall through to a read; it fails too when the file is unusable
+  }
+  return readLocalKey(file);
 }
 
 export const eventsFile = (home: string) => path.join(home, "events.jsonl");

@@ -509,9 +509,19 @@ function addAgent(d, a) {
   br.foxes.push(f); d.foxes.push(f); rebuildBlocked(d);
   return f;
 }
+// den label: "Scratch" outside any repo; "local/<folder>~<6 hex>" shows the folder (a folder may itself contain "~", so only a trailing ~ + 6 hex is cut);
+// "local/<10 hex>" (hash or hidden mode) has no name, so it is "Local repo" plus its first 4 hex to tell several apart; else the repo path
+function denName(repo) {
+  if (repo === 'scratch') return 'Scratch';
+  const unnamed = /^local\/([0-9a-f]{10})$/.exec(repo);
+  if (unnamed) return 'Local repo ' + unnamed[1].slice(0, 4);
+  const named = /^local\/(.+)~[0-9a-f]{6}$/.exec(repo);
+  if (named) return named[1];
+  return repo.replace(/^(github\.com|local)\//, '');
+}
 // t runs 0→1 while a room opens (and back while it closes); grow is the eased share of its width on the floor
 function makeDen(repo, i) {
-  return { id: 'd' + i, idx: i, repo, name: repo.replace('github.com/', ''), ox: 0, oy: 0,
+  return { id: 'd' + i, idx: i, repo, name: denName(repo), ox: 0, oy: 0,
     rug: RUGS[i % RUGS.length], foxes: [], parts: [], branches: [], later: [], open: false, t: 0, grow: 0, quiet: 0, slot: null,
     w: CELL_W, h: CELL_H, z0: 0 };
 }
@@ -2216,7 +2226,7 @@ function nameFor(id) {
 const ageOf = ev => Math.max(0, (Date.now() - Date.parse(ev.ts)) / 1000);
 
 function liveDen(repo) {
-  const key = repo || 'local';
+  const key = repo || 'scratch'; // only reached for a session with no known den: a known session keeps its fox (and den) in liveFox, so a repo-less event never moves it
   const known = DENS.find(d => d.repo === key);
   if (known) return known;
   const d = makeDen(key, DENS.length);
